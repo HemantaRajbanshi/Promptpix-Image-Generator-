@@ -1,0 +1,205 @@
+/* Masonry Gallery Styles */
+.masonry-gallery {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  grid-gap: 16px;
+  grid-auto-flow: dense;
+}
+
+/* Responsive grid columns */
+@media (min-width: 640px) {
+  .masonry-gallery {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .masonry-gallery {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .masonry-gallery {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .masonry-gallery {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+.masonry-item {
+  break-inside: avoid;
+  position: relative;
+  transition: transform 0.3s ease;
+  will-change: transform;
+}
+
+/* Hover effects */
+.masonry-item:hover {
+  z-index: 1;
+}
+
+/* Animation classes */
+.masonry-item-enter {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.masonry-item-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 300ms, transform 300ms;
+}
+
+.masonry-item-exit {
+  opacity: 1;
+}
+
+.masonry-item-exit-active {
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 300ms, transform 300ms;
+}
+
+/* Image container */
+.masonry-item-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  transition: transform 0.3s ease;
+}
+
+/* Image overlay */
+.masonry-item-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  color: white;
+  padding: 16px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.masonry-item:hover .masonry-item-overlay {
+  opacity: 1;
+}
+
+/* Loading animation */
+.masonry-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.masonry-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(128, 90, 213, 0.2);
+  border-top-color: rgba(128, 90, 213, 1);
+  animation: spin 1s infinite linear;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Empty state */
+.masonry-empty {
+  text-align: center;
+  padding: 48px;
+  background-color: #f9fafb;
+  border-radius: 8px;
+}
+
+.dark .masonry-empty {
+  background-color: #1f2937;
+}
+
+/* Shadow glow effects */
+.hover\:shadow-glow-purple:hover {
+  box-shadow: 0 0 15px 2px rgba(139, 92, 246, 0.5);
+}
+
+.hover\:shadow-glow-red:hover {
+  box-shadow: 0 0 15px 2px rgba(248, 113, 113, 0.5);
+}
+
+/* Modal styles */
+.masonry-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 16px;
+}
+
+.masonry-modal-content {
+  background-color: white;
+  border-radius: 12px;
+  max-width: 90%;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dark .masonry-modal-content {
+  background-color: #1f2937;
+}
+
+.masonry-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.dark .masonry-modal-header {
+  border-bottom-color: #374151;
+}
+
+.masonry-modal-body {
+  flex: 1;
+  overflow: auto;
+}
+
+.masonry-modal-image {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+}
+
+.masonry-modal-footer {
+  padding: 16px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dark .masonry-modal-footer {
+  border-top-color: #374151;
+}

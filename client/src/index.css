@@ -1,0 +1,132 @@
+/* Import modern fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* Import component styles */
+@import './styles/masonry.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+/* Base styles */
+body {
+  @apply font-sans bg-modern-bg-light text-gray-900 transition-colors duration-300;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  @apply font-display font-semibold tracking-tight;
+}
+
+/* Dark mode styles */
+.dark body {
+  @apply bg-modern-bg-dark text-gray-100;
+}
+
+/* Custom animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Modern Card styles */
+.card-modern {
+  @apply bg-white dark:bg-modern-card-dark rounded-[24px] shadow-soft transition-all duration-300 border border-gray-100 dark:border-gray-800;
+}
+
+.card-modern:hover {
+  @apply shadow-soft-lg transform -translate-y-1;
+}
+
+/* Add status indicator styles */
+.status-indicator {
+  @apply w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mt-4;
+}
+
+.status-indicator-bar {
+  @apply h-full bg-primary-500 rounded-full transition-all duration-300;
+}
+
+/* Glass effect */
+.glass {
+  @apply bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border border-white/20 dark:border-gray-800/30;
+}
+
+/* Button styles */
+.btn-primary {
+  @apply bg-gradient-to-r from-modern-accent-purple to-modern-accent-indigo text-white font-medium py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 active:scale-95;
+}
+
+.btn-secondary {
+  @apply bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-medium py-2 px-4 rounded-lg shadow-soft hover:shadow-soft-lg border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:scale-105 active:scale-95;
+}
+
+/* Modern Dashboard Components */
+.sidebar-item {
+  @apply flex items-center px-4 py-3 text-sm rounded-lg transition-all duration-300 relative overflow-hidden;
+}
+
+.sidebar-item-active {
+  @apply bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 font-medium border-l-4 border-primary-500 dark:border-primary-400;
+}
+
+.sidebar-item-active::before {
+  content: '';
+  @apply absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-purple-500 to-indigo-500 opacity-0;
+  animation: pulseIndicator 2s ease-in-out infinite;
+}
+
+@keyframes pulseIndicator {
+  0% { opacity: 0.7; }
+  50% { opacity: 1; }
+  100% { opacity: 0.7; }
+}
+
+.sidebar-item-inactive {
+  @apply text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-primary-600 dark:hover:text-primary-400 border-l-4 border-transparent;
+}
+
+.sidebar-item::after {
+  content: '';
+  @apply absolute bottom-0 left-4 right-4 h-[1px] bg-gray-100 dark:bg-gray-800 transform scale-x-0 transition-transform duration-300;
+}
+
+.sidebar-item:hover::after {
+  @apply scale-x-100;
+}
+
+.dashboard-card {
+  @apply bg-white dark:bg-modern-card-dark rounded-xl shadow-modern transition-all duration-300 border border-gray-100 dark:border-gray-800 hover:shadow-modern-lg hover:-translate-y-1;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  @apply w-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-gray-700 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400 dark:bg-gray-600;
+}
+
