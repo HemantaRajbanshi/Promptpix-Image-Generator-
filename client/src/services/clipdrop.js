@@ -8,82 +8,71 @@
  * - Background removal
  *
  * Each function includes robust error handling and fallback mechanisms.
+ *
+ * SECURITY UPDATE: This service now uses a secure backend proxy to protect the API key.
+ * All requests are authenticated and the API key is stored only on the server.
  */
 
-// Get API key from environment variables
-const API_KEY = import.meta.env.VITE_CLIPDROP_API_KEY;
-const BASE_URL = 'https://clipdrop-api.co';
-
-// Log API key for debugging (first few characters only)
-console.log('API Key (first 10 chars):', API_KEY ? API_KEY.substring(0, 10) + '...' : 'undefined');
+// Import the secure API service
+import { clipdropAPI } from './api';
 
 /**
  * Generate an image from text prompt
  * @param {string} prompt - Text description of the image to generate
- * @param {Object} options - Additional options like negative prompt
+ * @param {Object} options - Additional options like resolution
+ * @param {number} options.width - Width of the generated image (default: 1024)
+ * @param {number} options.height - Height of the generated image (default: 1024)
  * @returns {Promise<Blob>} - Generated image as blob
  */
 export const generateImage = async (prompt, options = {}) => {
-  // Prepare form data
-  const formData = new FormData();
-  formData.append('prompt', prompt);
-
-  // According to the API docs, negative_prompt is not supported
-  // We'll just log this for debugging
-  if (options.negativePrompt) {
-    console.log('Note: negative_prompt is not supported by the API, ignoring:', options.negativePrompt);
-  }
+  // ClipDrop API uses a fixed resolution of 1024x1024
+  // We'll ignore any provided width/height as the API doesn't support custom resolutions
+  const width = 1024;
+  const height = 1024;
 
   try {
     console.log('Generating image with prompt:', prompt);
-    console.log('API endpoint:', `${BASE_URL}/text-to-image/v1`);
-    console.log('Using API key:', API_KEY ? `${API_KEY.substring(0, 10)}...` : 'undefined');
+    console.log('Resolution:', `${width}x${height}`);
 
-    // Make API request with proper headers
-    const response = await fetch(`${BASE_URL}/text-to-image/v1`, {
-      method: 'POST',
-      headers: {
-        'x-api-key': API_KEY,
-        'Accept': 'image/png' // Explicitly request PNG format
-      },
-      body: formData,
-    });
-
-    // Log response details
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-    // For debugging - check if response is valid
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API Error:', errorText);
-      throw new Error(`API Error: ${response.status} - ${errorText}`);
-    }
-
-    // Get the image blob directly
-    const imageBlob = await response.blob();
+    // Call the secure API proxy with just the prompt
+    const imageBlob = await clipdropAPI.textToImage(prompt);
     console.log('Received image blob:', imageBlob.size, 'bytes, type:', imageBlob.type);
 
     return imageBlob;
   } catch (error) {
     console.error('Error generating image:', error);
 
+    // Show more detailed error information
+    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+      console.error('Network error: Check if the server is running and API key is configured');
+    } else if (error.message.includes('401') || error.message.includes('403')) {
+      console.error('Authentication error: API key may be invalid or expired');
+    } else if (error.message.includes('429')) {
+      console.error('Rate limit exceeded: Too many requests to the API');
+    }
+
     // Create fallback image if API call fails
     console.log('Creating fallback image...');
 
-    // Create canvas for fallback image
+    // Create canvas for fallback image with the requested dimensions
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext('2d');
 
-    // Create gradient background
+    // Create gradient background for high-resolution fallback
     const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
     gradient.addColorStop(0, '#8a2be2'); // Purple
     gradient.addColorStop(1, '#4169e1'); // Royal Blue
 
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Add format indicator
+    ctx.font = `${Math.max(16, canvas.width / 60)}px Arial`;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.textAlign = 'right';
+    ctx.fillText('1024×1024 PNG (high-quality, lossless)', canvas.width - 20, canvas.height - 20);
 
     // Add text to indicate fallback
     ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
@@ -108,44 +97,15 @@ export const generateImage = async (prompt, options = {}) => {
  * @returns {Promise<Blob>} - Upscaled image as blob
  */
 export const upscaleImage = async (imageFile) => {
-  // Prepare form data
-  const formData = new FormData();
-  formData.append('image_file', imageFile);
-
-  // Add required target dimensions
+  // Calculate target dimensions
   const targetWidth = Math.min(imageFile.width * 2 || 2048, 4096);
   const targetHeight = Math.min(imageFile.height * 2 || 2048, 4096);
-  formData.append('target_width', targetWidth);
-  formData.append('target_height', targetHeight);
 
   try {
     console.log('Upscaling image:', imageFile.name);
-    console.log('API endpoint:', `${BASE_URL}/image-upscaling/v1/upscale`);
-    console.log('Using API key:', API_KEY ? `${API_KEY.substring(0, 10)}...` : 'undefined');
 
-    // Make API request with proper headers
-    const response = await fetch(`${BASE_URL}/image-upscaling/v1/upscale`, {
-      method: 'POST',
-      headers: {
-        'x-api-key': API_KEY,
-        'Accept': 'image/*'
-      },
-      body: formData,
-    });
-
-    // Log response details
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-    // For debugging - check if response is valid
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API Error:', errorText);
-      throw new Error(`API Error: ${response.status} - ${errorText}`);
-    }
-
-    // Get the image blob directly
-    const imageBlob = await response.blob();
+    // Call the secure API proxy
+    const imageBlob = await clipdropAPI.upscaleImage(imageFile, targetWidth, targetHeight);
     console.log('Received image blob:', imageBlob.size, 'bytes, type:', imageBlob.type);
 
     return imageBlob;
@@ -192,45 +152,20 @@ export const upscaleImage = async (imageFile) => {
  * @returns {Promise<Blob>} - Uncropped image as blob
  */
 export const uncropImage = async (imageFile) => {
-  // Prepare form data
-  const formData = new FormData();
-  formData.append('image_file', imageFile);
-
-  // Add uncrop parameters - extend by 20% in all directions
+  // Define extend options
   const extendPixels = 200; // Default extend amount
-  formData.append('extend_left', extendPixels);
-  formData.append('extend_right', extendPixels);
-  formData.append('extend_up', extendPixels);
-  formData.append('extend_down', extendPixels);
+  const extendOptions = {
+    extend_left: extendPixels,
+    extend_right: extendPixels,
+    extend_up: extendPixels,
+    extend_down: extendPixels
+  };
 
   try {
     console.log('Uncropping image:', imageFile.name);
-    console.log('API endpoint:', `${BASE_URL}/uncrop/v1`);
-    console.log('Using API key:', API_KEY ? `${API_KEY.substring(0, 10)}...` : 'undefined');
 
-    // Make API request with proper headers
-    const response = await fetch(`${BASE_URL}/uncrop/v1`, {
-      method: 'POST',
-      headers: {
-        'x-api-key': API_KEY,
-        'Accept': 'image/*'
-      },
-      body: formData,
-    });
-
-    // Log response details
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-    // For debugging - check if response is valid
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API Error:', errorText);
-      throw new Error(`API Error: ${response.status} - ${errorText}`);
-    }
-
-    // Get the image blob directly
-    const imageBlob = await response.blob();
+    // Call the secure API proxy
+    const imageBlob = await clipdropAPI.uncropImage(imageFile, extendOptions);
     console.log('Received image blob:', imageBlob.size, 'bytes, type:', imageBlob.type);
 
     return imageBlob;
@@ -283,38 +218,11 @@ export const uncropImage = async (imageFile) => {
  * @returns {Promise<Blob>} - Image with background removed as blob
  */
 export const removeBackground = async (imageFile) => {
-  // Prepare form data
-  const formData = new FormData();
-  formData.append('image_file', imageFile);
-
   try {
     console.log('Removing background from image:', imageFile.name);
-    console.log('API endpoint:', `${BASE_URL}/remove-background/v1`);
-    console.log('Using API key:', API_KEY ? `${API_KEY.substring(0, 10)}...` : 'undefined');
 
-    // Make API request with proper headers
-    const response = await fetch(`${BASE_URL}/remove-background/v1`, {
-      method: 'POST',
-      headers: {
-        'x-api-key': API_KEY,
-        'Accept': 'image/png' // Explicitly request PNG for transparency
-      },
-      body: formData,
-    });
-
-    // Log response details
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-    // For debugging - check if response is valid
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API Error:', errorText);
-      throw new Error(`API Error: ${response.status} - ${errorText}`);
-    }
-
-    // Get the image blob directly
-    const imageBlob = await response.blob();
+    // Call the secure API proxy
+    const imageBlob = await clipdropAPI.removeBackground(imageFile);
     console.log('Received image blob:', imageBlob.size, 'bytes, type:', imageBlob.type);
 
     return imageBlob;
@@ -369,21 +277,7 @@ export const blobToURL = (blob) => {
   return URL.createObjectURL(blob);
 };
 
-/**
- * Download image to user's device
- * @param {Blob} blob - Image blob
- * @param {string} filename - Filename for download
- */
-export const downloadImage = (blob, filename = 'promptpix-image.png') => {
-  const url = blobToURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-};
+// Download functionality moved to utils/download.js
 
 // ===== Helper Functions =====
 

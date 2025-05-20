@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { getGalleryItems } from '../services/local-storage/gallery';
+import { getGalleryItems, addGalleryItem } from '../services/local-storage/gallery';
+import { debounce } from '../utils/debounce';
 
 const UserProfile = () => {
   const { user, updateUser } = useAuth();
@@ -23,6 +24,13 @@ const UserProfile = () => {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
+  // Track original user data for differential updates
+  const originalUserRef = useRef(null);
+  // Track if form has unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // Track pending updates to batch them
+  const pendingUpdatesRef = useRef({});
+
   // Calculate user statistics from gallery items
   const calculateUserStats = () => {
     if (!user) return;
@@ -30,6 +38,7 @@ const UserProfile = () => {
     try {
       // Get all gallery items
       const galleryItems = getGalleryItems();
+      console.log('Gallery items:', galleryItems);
 
       // Count images by type
       const generatedCount = galleryItems.filter(item =>
@@ -43,13 +52,43 @@ const UserProfile = () => {
         item.type === 'image-editor'
       ).length;
 
+      console.log('Current user stats:', {
+        current: {
+          imagesGenerated: user.imagesGenerated,
+          imagesEdited: user.imagesEdited
+        },
+        calculated: {
+          imagesGenerated: generatedCount,
+          imagesEdited: editedCount
+        }
+      });
+
       // Update user with statistics
       if (user.imagesGenerated !== generatedCount || user.imagesEdited !== editedCount) {
-        updateUser({
+        console.log('Stats need updating');
+
+        // Create a copy of the user object with updated statistics
+        const updatedUser = {
           ...user,
           imagesGenerated: generatedCount,
           imagesEdited: editedCount
+        };
+
+        // Update the user in the database
+        console.log('Calling updateUser with:', {
+          imagesGenerated: generatedCount,
+          imagesEdited: editedCount
         });
+
+        updateUser(updatedUser);
+
+        // Log the update for debugging
+        console.log('Updated user statistics:', {
+          imagesGenerated: generatedCount,
+          imagesEdited: editedCount
+        });
+      } else {
+        console.log('Stats already up to date');
       }
     } catch (error) {
       console.error('Error calculating user statistics:', error);
@@ -59,6 +98,10 @@ const UserProfile = () => {
   // Load user data and calculate statistics
   useEffect(() => {
     if (user) {
+      // Store original user data for differential updates
+      originalUserRef.current = { ...user };
+
+      // Set form data from user object
       setFormData({
         displayName: user.displayName || '',
         email: user.email || '',
@@ -69,19 +112,95 @@ const UserProfile = () => {
         confirmPassword: ''
       });
 
+      // Reset unsaved changes state and pending updates
+      setHasUnsavedChanges(false);
+      pendingUpdatesRef.current = {};
+
       // Calculate statistics
       calculateUserStats();
+    } else {
+      // Check if there's a token but no user data
+      const token = localStorage.getItem('token');
+      if (token) {
+        // Force a page reload after a short delay to try to fetch user data again
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Recalculate statistics when the component mounts
+  useEffect(() => {
+    if (user) {
+      // Add some test gallery items if none exist
+      const galleryItems = getGalleryItems();
+      if (galleryItems.length === 0) {
+
+        // Add test items
+        const testItems = [
+          {
+            type: 'text-to-image',
+            prompt: 'Test generated image 1',
+            imageData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+          },
+          {
+            type: 'text-to-image',
+            prompt: 'Test generated image 2',
+            imageData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+          },
+          {
+            type: 'image-editor',
+            prompt: 'Test edited image',
+            imageData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+          }
+        ];
+
+        // Add each test item to the gallery
+        testItems.forEach(async (item) => {
+          await addGalleryItem(item);
+        });
+
+        console.log('Added test gallery items');
+      }
+
+      // Calculate statistics
+      calculateUserStats();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Create a debounced update function that only sends changes after 500ms of inactivity
+  const debouncedUpdateUser = useCallback(
+    debounce((fieldName, fieldValue) => {
+      console.log(`Debounced update for field: ${fieldName}, value: ${fieldValue}`);
+
+      // Store the pending update
+      pendingUpdatesRef.current[fieldName] = fieldValue;
+
+      // Mark form as having unsaved changes
+      setHasUnsavedChanges(true);
+
+      // We don't send the update immediately - it will be sent when the form is saved
+    }, 500),
+    [] // Empty dependency array means this function is created only once
+  );
+
   // Handle form input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    // Update form state immediately for responsive UI
     setFormData(prevData => ({
       ...prevData,
       [name]: value
     }));
+
+    // Only debounce non-password fields that should be sent to the server
+    if (name !== 'currentPassword' && name !== 'newPassword' && name !== 'confirmPassword') {
+      debouncedUpdateUser(name, value);
+    }
   };
 
   // Handle form submission
@@ -102,26 +221,80 @@ const UserProfile = () => {
         }
       }
 
-      // Update user profile
+      // Collect all changes from form data and pending updates
+      const changedFields = {};
+
+      // Add fields from form data
+      if (formData.displayName !== originalUserRef.current.displayName) {
+        changedFields.displayName = formData.displayName;
+      }
+
+      if (formData.bio !== originalUserRef.current.bio) {
+        changedFields.bio = formData.bio;
+      }
+
+      if (formData.profilePicture && formData.profilePicture !== originalUserRef.current.profilePicture) {
+        changedFields.profilePicture = formData.profilePicture;
+      }
+
+      // Add any other pending updates
+      Object.assign(changedFields, pendingUpdatesRef.current);
+
+      // Only proceed if there are actual changes
+      if (Object.keys(changedFields).length === 0) {
+        setMessage({
+          type: 'info',
+          text: 'No changes to save'
+        });
+        setIsSubmitting(false);
+        setIsEditing(false);
+        return;
+      }
+
+      console.log('Saving changes:', changedFields);
+
+      // Create updated user object with only the changed fields
       const updatedUser = {
         ...user,
-        displayName: formData.displayName,
-        bio: formData.bio,
-        profilePicture: formData.profilePicture || user.profilePicture
+        ...changedFields
       };
 
-      // In a real app, you would send this to your backend
-      // For now, we'll just update the local state
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      // Optimistic UI update - update the UI immediately
+      const previousUser = { ...user };
 
-      updateUser(updatedUser);
-
+      // Update local state optimistically
       setMessage({
-        type: 'success',
-        text: 'Profile updated successfully!'
+        type: 'info',
+        text: 'Saving changes...'
       });
 
-      setIsEditing(false);
+      try {
+        // Send update to server
+        await updateUser(updatedUser);
+
+        // Update was successful
+        setMessage({
+          type: 'success',
+          text: 'Profile updated successfully!'
+        });
+
+        // Reset unsaved changes state and pending updates
+        setHasUnsavedChanges(false);
+        pendingUpdatesRef.current = {};
+
+        // Update original user reference
+        originalUserRef.current = { ...updatedUser };
+
+        setIsEditing(false);
+      } catch (updateError) {
+        // If update fails, revert to previous state
+        console.error('Failed to update profile:', updateError);
+
+        // Revert optimistic update
+        updateUser(previousUser);
+
+        throw new Error('Failed to save changes. Please try again.');
+      }
 
       // Clear password fields
       setFormData(prevData => ({
@@ -181,7 +354,33 @@ const UserProfile = () => {
     tap: { scale: 0.95 }
   };
 
+  // Debug user data
+  console.log('UserProfile component - user data:', user);
+
+  // Check if user data is available
   if (!user) {
+    // Check if there's a token but no user data
+    const hasToken = !!localStorage.getItem('token');
+    console.log('UserProfile - No user data, token exists:', hasToken);
+
+    // If token exists but no user data, try to fetch user data again
+    if (hasToken) {
+      // This will trigger a re-render when the user data is fetched
+      const { fetchCurrentUser } = useAuth();
+
+      // Use useEffect to avoid calling fetchCurrentUser during render
+      useEffect(() => {
+        console.log('Attempting to fetch user data again from UserProfile component');
+
+        // Set a timeout to avoid infinite loops
+        const timeoutId = setTimeout(() => {
+          fetchCurrentUser();
+        }, 1000);
+
+        return () => clearTimeout(timeoutId);
+      }, []);
+    }
+
     return (
       <div className="flex justify-center items-center h-64">
         <motion.div
@@ -199,6 +398,41 @@ const UserProfile = () => {
             ></motion.div>
           </div>
           <p className="mt-4 text-gray-600 dark:text-gray-400 font-medium">Loading profile...</p>
+
+          {/* Show different buttons based on token existence */}
+          {hasToken ? (
+            <div className="mt-4 flex flex-col gap-2">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Attempting to load your profile data...
+              </p>
+              <button
+                onClick={() => {
+                  // Force refresh user data
+                  window.location.reload();
+                }}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+              >
+                Refresh Page
+              </button>
+              <button
+                onClick={() => {
+                  // Clear token and redirect to login
+                  localStorage.removeItem('token');
+                  window.location.href = '/login';
+                }}
+                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+              >
+                Sign Out & Login Again
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => window.location.href = '/login'}
+              className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+            >
+              Go to Login
+            </button>
+          )}
         </motion.div>
       </div>
     );
@@ -323,6 +557,24 @@ const UserProfile = () => {
 
             {isEditing ? (
               <form onSubmit={handleSubmit}>
+                <div className="flex justify-between items-center mb-6">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Edit Profile</h2>
+                    {hasUnsavedChanges && (
+                      <span className="text-xs px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded-full">
+                        Unsaved changes
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(false)}
+                    className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </button>
+                </div>
                 <div className="space-y-6">
                   {/* Profile Picture Upload */}
                   <div>

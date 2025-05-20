@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 const ContactUs = () => {
@@ -25,20 +25,36 @@ const ContactUs = () => {
     }));
   };
 
+  // Form reference for direct submission
+  const form = useRef();
+
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate API call
     try {
-      // In a real app, you would send the form data to your backend
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Create email content
+      const emailContent = `
+        Name: ${formData.name}
+        Email: ${formData.email}
+        Subject: ${formData.subject}
 
+        Message:
+        ${formData.message}
+      `;
+
+      // Create mailto URL with all form data
+      const mailtoUrl = `mailto:peacemusic80@gmail.com?subject=${encodeURIComponent(formData.subject)}&body=${encodeURIComponent(emailContent)}`;
+
+      // Open the user's email client with the pre-filled email
+      window.open(mailtoUrl, '_blank');
+
+      // Show success message
       setFormStatus({
         submitted: true,
         success: true,
-        message: 'Thank you for your message! We will get back to you soon.'
+        message: 'Thank you for your message! Your default email client has been opened with your message. Please send the email to complete the process.'
       });
 
       // Reset form
@@ -49,10 +65,11 @@ const ContactUs = () => {
         message: ''
       });
     } catch (error) {
+      console.error('Error sending message:', error);
       setFormStatus({
         submitted: true,
         success: false,
-        message: 'There was an error sending your message. Please try again.'
+        message: 'There was an error sending your message. Please try again or contact us directly at peacemusic80@gmail.com.'
       });
     } finally {
       setIsSubmitting(false);
@@ -131,7 +148,7 @@ const ContactUs = () => {
                     </div>
                     <div className="ml-4 text-gray-700 dark:text-gray-300">
                       <p className="text-sm font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400">Email</p>
-                      <p className="mt-1 text-lg"><a href="mailto:support@promptpix.com" className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">support@promptpix.com</a></p>
+                      <p className="mt-1 text-lg"><a href="mailto:peacemusic80@gmail.com" className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">peacemusic80@gmail.com</a></p>
                     </div>
                   </div>
                   <div className="flex items-start group">
@@ -142,7 +159,7 @@ const ContactUs = () => {
                     </div>
                     <div className="ml-4 text-gray-700 dark:text-gray-300">
                       <p className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Phone</p>
-                      <p className="mt-1 text-lg"><a href="tel:+15551234567" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">+1 (555) 123-4567</a></p>
+                      <p className="mt-1 text-lg"><a href="tel:+9779816927699" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">+977 9816927699</a></p>
                     </div>
                   </div>
                   <div className="flex items-start group">
@@ -154,7 +171,7 @@ const ContactUs = () => {
                     </div>
                     <div className="ml-4 text-gray-700 dark:text-gray-300">
                       <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">Address</p>
-                      <p className="mt-1 text-lg">123 Innovation Drive<br />San Francisco, CA 94103</p>
+                      <p className="mt-1 text-lg">Mechi Multiple Campus<br />H36P+WV3, Bhadrapur 57200<br />Nepal</p>
                     </div>
                   </div>
                 </div>
@@ -214,7 +231,7 @@ const ContactUs = () => {
                 </motion.div>
               )}
 
-              <form onSubmit={handleSubmit} className="mt-8">
+              <form ref={form} onSubmit={handleSubmit} className="mt-8">
                 <div className="grid grid-cols-1 gap-y-6">
                   <div className="relative">
                     <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -349,13 +366,13 @@ const ContactUs = () => {
             <div className="absolute top-0 left-0 w-full bg-gradient-to-r from-purple-600 to-indigo-600 h-2 z-10"></div>
             <div className="aspect-w-16 aspect-h-9">
               <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3153.0952890486277!2d-122.41941548468204!3d37.77492997975903!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8085809c6c8f4459%3A0xb10ed6d9b5050fa5!2sTwitter%20HQ!5e0!3m2!1sen!2sus!4v1618523093901!5m2!1sen!2sus"
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3572.0394346351!2d88.087163!3d26.561046!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39e5ba6b84a4f8b3%3A0x2c9a4b3b0c237e0!2sMechi%20Multiple%20Campus%2C%20H36P%2BWV3%2C%20Mechi%20Multiple%20Campus%2C%20Bhadrapur%2057200!5e0!3m2!1sen!2snp!4v1695900000000!5m2!1sen!2snp"
                 width="100%"
                 height="450"
                 style={{ border: 0 }}
                 allowFullScreen=""
                 loading="lazy"
-                title="Office Location"
+                title="Mechi Multiple Campus Location"
                 className="w-full h-full"
               ></iframe>
             </div>
@@ -368,8 +385,8 @@ const ContactUs = () => {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">PromptPix HQ</p>
-                  <p className="text-xs text-gray-600 dark:text-gray-300">123 Innovation Drive, San Francisco</p>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">Mechi Multiple Campus</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-300">H36P+WV3, Bhadrapur 57200, Nepal</p>
                 </div>
               </div>
             </div>

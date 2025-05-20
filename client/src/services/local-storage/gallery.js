@@ -241,8 +241,29 @@ const blobToBase64 = async (blob, options = {}) => {
       }
     };
 
-    img.onerror = reject;
-    img.src = URL.createObjectURL(blob);
+    img.onerror = (error) => {
+      // Clean up the blob URL on error
+      URL.revokeObjectURL(img.src);
+      reject(error);
+    };
+
+    // Create a blob URL
+    const blobUrl = URL.createObjectURL(blob);
+
+    // Set up onload to clean up the blob URL after use
+    const originalOnload = img.onload;
+    img.onload = function() {
+      // Clean up the blob URL after the image is loaded
+      URL.revokeObjectURL(blobUrl);
+
+      // Call the original onload handler
+      if (originalOnload) {
+        originalOnload.call(this);
+      }
+    };
+
+    // Set the image source
+    img.src = blobUrl;
   });
 };
 

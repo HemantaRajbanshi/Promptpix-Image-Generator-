@@ -5,6 +5,7 @@ import ModernRotateTool from './ModernRotateTool';
 import ModernFilterTool from './ModernFilterTool';
 import ModernAdjustmentTool from './ModernAdjustmentTool';
 import blobURLManager from '../utils/blobURLManager';
+import { downloadImage } from '../utils/download';
 
 const ModernImageEditor = ({ imageUrl, onClose, onSave }) => {
   // State
@@ -214,14 +215,8 @@ const ModernImageEditor = ({ imageUrl, onClose, onSave }) => {
     if (canvasRef.current) {
       canvasRef.current.toBlob((blob) => {
         if (blob) {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `edited-image-${new Date().toISOString().split('T')[0]}.png`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
+          // Download high-quality PNG
+          downloadImage(blob, `promptpix-edited-${Date.now()}.png`);
         }
       }, 'image/png', 0.95);
     }
@@ -333,7 +328,7 @@ const ModernImageEditor = ({ imageUrl, onClose, onSave }) => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              Download
+              Download Image
             </motion.button>
 
             <motion.button

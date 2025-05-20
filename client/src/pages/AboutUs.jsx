@@ -25,28 +25,16 @@ const AboutUs = () => {
   // Team members data
   const teamMembers = [
     {
-      name: 'Alex Johnson',
+      name: 'Hemanta Rajbanshi',
       role: 'Founder & CEO',
-      bio: 'Alex has over 10 years of experience in AI and machine learning, with a focus on computer vision and image processing.',
-      image: 'https://randomuser.me/api/portraits/men/32.jpg'
+      bio: 'Hemanta is the visionary behind PromptPix, combining his passion for AI with a mission to make advanced image generation accessible to everyone.',
+      image: '/images/team/hemanta.jpg'
     },
     {
-      name: 'Sarah Chen',
-      role: 'CTO',
-      bio: 'Sarah leads our technical team with her expertise in deep learning models and neural networks for image generation.',
-      image: 'https://randomuser.me/api/portraits/women/44.jpg'
-    },
-    {
-      name: 'Michael Rodriguez',
+      name: 'Abhishek Chaulagain',
       role: 'Lead Developer',
-      bio: 'Michael specializes in frontend development and creating intuitive user interfaces for complex AI applications.',
-      image: 'https://randomuser.me/api/portraits/men/67.jpg'
-    },
-    {
-      name: 'Priya Patel',
-      role: 'AI Research Scientist',
-      bio: 'Priya focuses on developing cutting-edge algorithms for image enhancement and transformation.',
-      image: 'https://randomuser.me/api/portraits/women/63.jpg'
+      bio: 'Abhishek leads our development team, bringing expertise in frontend and backend technologies to create seamless, intuitive user experiences.',
+      image: '/images/team/abhishek.jpg'
     }
   ];
 
@@ -70,7 +58,7 @@ const AboutUs = () => {
           <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-24 h-1 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full"></div>
         </h1>
         <p className="mt-5 max-w-xl mx-auto text-xl text-gray-500 dark:text-gray-300">
-          We're on a mission to make AI image generation and editing accessible to everyone.
+          Transforming imagination into stunning visuals with the power of AI, made simple for everyone.
         </p>
       </motion.div>
 
@@ -109,19 +97,18 @@ const AboutUs = () => {
               </h2>
               <div className="prose prose-lg prose-purple dark:prose-invert">
                 <p className="text-lg">
-                  Founded in 2023, PromptPix began with a simple idea: to make powerful AI image tools accessible to everyone, not just technical experts.
+                  PromptPix was born in 2023 from a moment of inspiration when Hemanta Rajbanshi, frustrated by the complexity of existing AI image tools, envisioned a platform where creativity wouldn't be limited by technical knowledge.
                 </p>
                 <p className="mt-4 text-lg">
-                  Our team of AI researchers and developers came together with a shared vision of democratizing access to cutting-edge image generation and editing technology.
+                  What began as a passion project quickly evolved into a mission: to bridge the gap between cutting-edge AI technology and everyday users who want to bring their creative visions to life.
                 </p>
                 <p className="mt-4 text-lg">
-                  Today, we're proud to offer a suite of tools that empower creators, marketers, designers, and everyday users to transform their ideas into stunning visuals with just a few clicks.
+                  With Abhishek Chaulagain joining as Lead Developer, our small but dedicated team has created an intuitive platform that transforms complex AI processes into simple, accessible tools that anyone can use to create stunning visuals with just a few clicks.
                 </p>
                 <div className="mt-6 flex items-center">
                   <div className="flex -space-x-2 mr-4">
-                    <img className="inline-block h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-800" src="https://randomuser.me/api/portraits/men/32.jpg" alt="" />
-                    <img className="inline-block h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-800" src="https://randomuser.me/api/portraits/women/44.jpg" alt="" />
-                    <img className="inline-block h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-800" src="https://randomuser.me/api/portraits/men/67.jpg" alt="" />
+                    <img className="inline-block h-10 w-10 rounded-full ring-2 ring-white dark:ring-gray-800" src="/images/team/hemanta-small.jpg" alt="Hemanta" />
+                    <img className="inline-block h-10 w-10 rounded-full ring-2 ring-white dark:ring-gray-800" src="/images/team/abhishek-small.jpg" alt="Abhishek" />
                   </div>
                   <span className="text-sm text-gray-500 dark:text-gray-400">Our founding team</span>
                 </div>
@@ -159,7 +146,7 @@ const AboutUs = () => {
               </div>
               <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">Innovation</h3>
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                We're committed to staying at the forefront of AI image technology, constantly improving our models and algorithms.
+                We're committed to pushing the boundaries of what's possible with AI image generation, making tomorrow's technology accessible today.
               </p>
               <div className="mt-4 w-12 h-1 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full"></div>
             </div>
@@ -171,7 +158,7 @@ const AboutUs = () => {
               </div>
               <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">Accessibility</h3>
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                We believe powerful AI tools should be accessible to everyone, regardless of technical expertise.
+                We're breaking down barriers between advanced AI technology and everyday users, empowering everyone to create stunning visuals regardless of technical background.
               </p>
               <div className="mt-4 w-12 h-1 bg-gradient-to-r from-indigo-500 to-blue-600 rounded-full"></div>
             </div>
@@ -183,7 +170,7 @@ const AboutUs = () => {
               </div>
               <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">Responsibility</h3>
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                We're dedicated to the ethical development and use of AI technology, with a focus on privacy and security.
+                We're committed to the ethical development of AI, ensuring our tools enhance human creativity rather than replace it, while maintaining the highest standards of privacy and security.
               </p>
               <div className="mt-4 w-12 h-1 bg-gradient-to-r from-blue-500 to-teal-500 rounded-full"></div>
             </div>
@@ -207,11 +194,11 @@ const AboutUs = () => {
             <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-16 h-1 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full"></div>
           </h2>
           <p className="mt-4 text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Our talented team of experts is passionate about AI and dedicated to creating the best image generation tools.
+            Behind PromptPix is a small but mighty team driven by a shared passion for making AI image generation accessible, intuitive, and powerful.
           </p>
         </motion.div>
         <motion.div
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8"
+          className="grid grid-cols-1 sm:grid-cols-2 max-w-4xl mx-auto gap-8"
           variants={itemVariants}
         >
           {teamMembers.map((member, index) => (

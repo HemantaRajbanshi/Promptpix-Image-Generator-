@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getGalleryItems, removeGalleryItem } from '../services/local-storage/gallery';
-import { downloadImage } from '../services/clipdrop';
+import { downloadImage } from '../utils/download';
 
 const MasonryGallery = () => {
   const [galleryItems, setGalleryItems] = useState([]);
@@ -12,6 +12,22 @@ const MasonryGallery = () => {
   // Load gallery items on component mount
   useEffect(() => {
     loadGalleryItems();
+
+    // Return cleanup function to revoke any blob URLs when component unmounts
+    return () => {
+      // Clean up any blob URLs that might still be in memory
+      if (window._blobUrlsToRevoke && window._blobUrlsToRevoke.length > 0) {
+        console.log(`Cleaning up ${window._blobUrlsToRevoke.length} blob URLs on unmount`);
+        window._blobUrlsToRevoke.forEach(url => {
+          try {
+            URL.revokeObjectURL(url);
+          } catch (error) {
+            console.error('Error revoking blob URL:', error);
+          }
+        });
+        window._blobUrlsToRevoke = [];
+      }
+    };
   }, []);
 
   // Load gallery items from local storage
@@ -46,19 +62,27 @@ const MasonryGallery = () => {
   const handleDownload = async (item) => {
     try {
       if (item.imageData) {
-        // If we have imageData (base64), create a download link
-        const link = document.createElement('a');
-        link.href = item.imageData;
-        link.download = `promptpix-${item.id}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // If we have imageData (base64), convert to blob first for standardized download
+        const response = await fetch(item.imageData);
+        const blob = await response.blob();
+        // Download high-quality PNG
+        downloadImage(blob, `promptpix-${item.id}.png`);
+      } else if (item.blob) {
+        // If we have the blob directly, use it
+        downloadImage(item.blob, `promptpix-${item.id}.png`);
       } else if (item.imageUrl) {
-        // If we have an imageUrl, use the ClipDrop download service
-        await downloadImage(item.imageUrl, `promptpix-${item.id}.png`);
+        // If we have an imageUrl, fetch it first
+        const response = await fetch(item.imageUrl);
+        const blob = await response.blob();
+        // Download high-quality PNG
+        downloadImage(blob, `promptpix-${item.id}.png`);
+      } else {
+        console.error('No image data available for download');
+        alert('Unable to download this image. The image data is not available.');
       }
     } catch (error) {
       console.error('Error downloading image:', error);
+      alert('Failed to download image. Please try again.');
     }
   };
 
@@ -223,11 +247,62 @@ const MasonryGallery = () => {
                 ) : (
                   <>
                     <img
-                      src={item.imageData || (item.imageUrl && !item.imageUrl.startsWith('blob:') ? item.imageUrl : null) || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZpbGw9IiM5OTk5OTkiPkltYWdlIG5vdCBhdmFpbGFibGU8L3RleHQ+PC9zdmc+'}
+                      src={
+                        // Try to use the most reliable source first
+                        item.imageData ||
+                        // For blob URLs, check if they're still valid
+                        (item.imageUrl && item.imageUrl.startsWith('blob:') && item.blob ? item.imageUrl : null) ||
+                        // For regular URLs, use them directly
+                        (item.imageUrl && !item.imageUrl.startsWith('blob:') ? item.imageUrl : null) ||
+                        // Fallback to placeholder
+                        'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZpbGw9IiM5OTk5OTkiPkltYWdlIG5vdCBhdmFpbGFibGU8L3RleHQ+PC9zdmc+'
+                      }
                       alt={item.prompt || 'Generated image'}
                       className="w-full h-full object-cover absolute inset-0"
                       onError={(e) => {
                         console.error('Image failed to load:', item.id);
+                        // Try to recover the image if possible
+                        if (item.blob && !item.imageData) {
+                          try {
+                            // Create a new URL from the blob
+                            const newUrl = URL.createObjectURL(item.blob);
+                            console.log('Recovering image with new blob URL');
+
+                            // Store the URL for cleanup when the component unmounts
+                            if (!window._blobUrlsToRevoke) {
+                              window._blobUrlsToRevoke = [];
+                            }
+                            window._blobUrlsToRevoke.push(newUrl);
+
+                            // Set up cleanup when the image is loaded successfully
+                            const img = e.target;
+                            const originalOnLoad = img.onload;
+
+                            img.onload = function() {
+                              // Clean up the blob URL after successful load
+                              URL.revokeObjectURL(newUrl);
+
+                              // Remove from tracking array
+                              if (window._blobUrlsToRevoke) {
+                                const index = window._blobUrlsToRevoke.indexOf(newUrl);
+                                if (index !== -1) {
+                                  window._blobUrlsToRevoke.splice(index, 1);
+                                }
+                              }
+
+                              // Call original onload if it exists
+                              if (originalOnLoad) {
+                                originalOnLoad.call(this);
+                              }
+                            };
+
+                            e.target.src = newUrl;
+                            return;
+                          } catch (blobError) {
+                            console.error('Failed to recover image from blob:', blobError);
+                          }
+                        }
+                        // Fallback to placeholder
                         e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZpbGw9IiM5OTk5OTkiPkltYWdlIG5vdCBhdmFpbGFibGU8L3RleHQ+PC9zdmc+';
                       }}
                     />
@@ -298,7 +373,18 @@ const MasonryGallery = () => {
       {selectedItem && (
         <div
           className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
-          onClick={() => setSelectedItem(null)}
+          onClick={() => {
+            // Clean up any blob URLs created specifically for the modal
+            if (window._modalBlobUrl) {
+              try {
+                URL.revokeObjectURL(window._modalBlobUrl);
+                window._modalBlobUrl = null;
+              } catch (error) {
+                console.error('Error revoking modal blob URL:', error);
+              }
+            }
+            setSelectedItem(null);
+          }}
         >
           <div
             className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl"
@@ -316,7 +402,18 @@ const MasonryGallery = () => {
                 </h3>
               </div>
               <button
-                onClick={() => setSelectedItem(null)}
+                onClick={() => {
+                  // Clean up any blob URLs created specifically for the modal
+                  if (window._modalBlobUrl) {
+                    try {
+                      URL.revokeObjectURL(window._modalBlobUrl);
+                      window._modalBlobUrl = null;
+                    } catch (error) {
+                      console.error('Error revoking modal blob URL:', error);
+                    }
+                  }
+                  setSelectedItem(null);
+                }}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 bg-white/80 dark:bg-gray-700/80 p-2 rounded-lg transition-colors"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -329,11 +426,65 @@ const MasonryGallery = () => {
               <div className="flex flex-col md:flex-row">
                 <div className="md:w-2/3 p-6 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
                   <img
-                    src={selectedItem.imageData || selectedItem.imageUrl}
+                    src={
+                      // Try to use the most reliable source first
+                      selectedItem.imageData ||
+                      // For blob URLs, check if they're still valid
+                      (selectedItem.imageUrl && selectedItem.imageUrl.startsWith('blob:') && selectedItem.blob ? selectedItem.imageUrl : null) ||
+                      // For regular URLs, use them directly
+                      (selectedItem.imageUrl && !selectedItem.imageUrl.startsWith('blob:') ? selectedItem.imageUrl : null) ||
+                      // Fallback to placeholder
+                      'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZpbGw9IiM5OTk5OTkiPkltYWdlIG5vdCBhdmFpbGFibGU8L3RleHQ+PC9zdmc+'
+                    }
                     alt={selectedItem.prompt || 'Generated image'}
                     className="max-w-full max-h-[60vh] object-contain shadow-xl rounded-lg border border-gray-200 dark:border-gray-700"
                     onError={(e) => {
                       console.error('Modal image failed to load:', selectedItem.id);
+                      // Try to recover the image if possible
+                      if (selectedItem.blob && !selectedItem.imageData) {
+                        try {
+                          // Create a new URL from the blob
+                          const newUrl = URL.createObjectURL(selectedItem.blob);
+                          console.log('Recovering modal image with new blob URL');
+
+                          // Store the URL for cleanup when the modal is closed
+                          window._modalBlobUrl = newUrl;
+
+                          // Also store in the general cleanup array as a backup
+                          if (!window._blobUrlsToRevoke) {
+                            window._blobUrlsToRevoke = [];
+                          }
+                          window._blobUrlsToRevoke.push(newUrl);
+
+                          // Set up cleanup when the image is loaded successfully
+                          const img = e.target;
+                          const originalOnLoad = img.onload;
+
+                          img.onload = function() {
+                            // Clean up the blob URL after successful load
+                            URL.revokeObjectURL(newUrl);
+
+                            // Remove from tracking array
+                            if (window._blobUrlsToRevoke) {
+                              const index = window._blobUrlsToRevoke.indexOf(newUrl);
+                              if (index !== -1) {
+                                window._blobUrlsToRevoke.splice(index, 1);
+                              }
+                            }
+
+                            // Call original onload if it exists
+                            if (originalOnLoad) {
+                              originalOnLoad.call(this);
+                            }
+                          };
+
+                          e.target.src = newUrl;
+                          return;
+                        } catch (blobError) {
+                          console.error('Failed to recover modal image from blob:', blobError);
+                        }
+                      }
+                      // Fallback to placeholder
                       e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZpbGw9IiM5OTk5OTkiPkltYWdlIG5vdCBhdmFpbGFibGU8L3RleHQ+PC9zdmc+';
                     }}
                   />
@@ -378,7 +529,7 @@ const MasonryGallery = () => {
                       <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
-                      Download
+                      Download Image
                     </button>
                     <button
                       onClick={() => handleDeleteItem(selectedItem.id)}

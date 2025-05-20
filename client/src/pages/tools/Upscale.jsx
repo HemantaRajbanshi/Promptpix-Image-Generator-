@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { upscaleImage, downloadImage } from '../../services/clipdrop';
+import { upscaleImage } from '../../services/clipdrop';
+import { downloadImage } from '../../utils/download';
 import { addGalleryItem } from '../../services/local-storage/gallery';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
