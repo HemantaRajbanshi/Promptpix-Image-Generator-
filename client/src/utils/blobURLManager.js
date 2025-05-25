@@ -1,5 +1,5 @@
 /**
- * BlobURLManager - A utility to manage blob URLs and prevent memory leaks
+ * BlobUrlManager - A utility to manage blob URLs and prevent memory leaks
  * 
  * This manager keeps track of all created blob URLs and provides methods to:
  * - Create new blob URLs
@@ -7,7 +7,7 @@
  * - Revoke all blob URLs when they're no longer needed
  */
 
-class BlobURLManager {
+class BlobUrlManager {
   constructor() {
     // Set to store all active blob URLs
     this.activeURLs = new Set();
@@ -73,9 +73,25 @@ class BlobURLManager {
   isValid(url) {
     return url && url.startsWith('blob:') && this.activeURLs.has(url);
   }
+
+  /**
+   * Get the count of active blob URLs
+   * @returns {number} Number of active blob URLs
+   */
+  getActiveCount() {
+    return this.activeURLs.size;
+  }
+
+  /**
+   * Get all active blob URLs (for debugging)
+   * @returns {Array<string>} Array of active blob URLs
+   */
+  getActiveUrls() {
+    return Array.from(this.activeURLs);
+  }
 }
 
 // Create a singleton instance
-const blobURLManager = new BlobURLManager();
+const blobUrlManager = new BlobUrlManager();
 
-export default blobURLManager;
+export default blobUrlManager;

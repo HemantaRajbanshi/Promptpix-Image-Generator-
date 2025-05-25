@@ -2,7 +2,7 @@ const axios = require('axios');
 const FormData = require('form-data');
 
 // Base URL for ClipDrop API
-const BASE_URL = 'https://clipdrop-api.co';
+const BASE_URL = process.env.CLIPDROP_API_URL || 'https://clipdrop-api.co';
 
 // Helper function to handle file uploads and API calls
 const makeClipDropRequest = async (endpoint, formData, res) => {
@@ -28,7 +28,9 @@ const makeClipDropRequest = async (endpoint, formData, res) => {
         const randomImage = imageFiles[Math.floor(Math.random() * imageFiles.length)];
         const imagePath = require('path').join(publicImagesPath, randomImage);
 
-        console.log(`Using sample image: ${randomImage}`);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`Using sample image: ${randomImage}`);
+        }
 
         // Read and send the image
         const sampleImage = fs.readFileSync(imagePath);
@@ -38,7 +40,9 @@ const makeClipDropRequest = async (endpoint, formData, res) => {
         return;
       }
     } catch (sampleError) {
-      console.error('Error using sample images:', sampleError);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error using sample images:', sampleError);
+      }
     }
 
     // Fallback to mock image

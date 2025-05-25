@@ -4,7 +4,9 @@
  * This service provides functions to interact with the backend API
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+import { API_CONFIG, STORAGE_KEYS, ERROR_MESSAGES } from '../constants';
+
+const API_URL = API_CONFIG.BASE_URL;
 
 /**
  * Make a request to the API
@@ -32,16 +34,12 @@ const apiRequest = async (endpoint, options = {}) => {
   };
 
   // Add authorization header if token exists
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
   if (token) {
-    console.log(`Adding token to request for ${endpoint}`);
     mergedOptions.headers.Authorization = `Bearer ${token}`;
-  } else {
-    console.log(`No token available for request to ${endpoint}`);
   }
 
   try {
-    console.log(`Making API request to ${endpoint}`);
     const response = await fetch(`${API_URL}${endpoint}`, mergedOptions);
 
     // Try to parse response as JSON
@@ -49,20 +47,16 @@ const apiRequest = async (endpoint, options = {}) => {
     try {
       data = await response.json();
     } catch (jsonError) {
-      console.error('Failed to parse response as JSON:', jsonError);
       throw new Error('Invalid response format');
     }
 
     // Check if response is ok
     if (!response.ok) {
-      console.error('API Error Response:', data);
       throw new Error(data.message || 'Something went wrong');
     }
 
     return data;
   } catch (error) {
-    console.error(`API Error (${endpoint}):`, error);
-
     // If the error is related to authentication, clear the token
     if (error.message && (
       error.message.includes('token') ||
@@ -70,8 +64,7 @@ const apiRequest = async (endpoint, options = {}) => {
       error.message.includes('unauthorized') ||
       error.message.includes('not logged in')
     )) {
-      console.warn('Authentication error detected, clearing token');
-      localStorage.removeItem('token');
+      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
     }
 
     throw error;
@@ -97,10 +90,7 @@ export const authAPI = {
 
     // Save token to localStorage
     if (data.token) {
-      console.log('Login successful, saving token');
-      localStorage.setItem('token', data.token);
-    } else {
-      console.warn('Login response did not contain a token:', data);
+      localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, data.token);
     }
 
     return data;
@@ -114,6 +104,53 @@ export const authAPI = {
     localStorage.removeItem('token');
 
     return data;
+  },
+
+  // Update password
+  updatePassword: async (currentPassword, newPassword) => {
+    return apiRequest('/auth/update-password', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({
+        currentPassword,
+        newPassword
+      }),
+    });
+  },
+
+  // Send OTP for forgot password
+  forgotPassword: async (email) => {
+    return apiRequest('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  // Reset password with OTP
+  resetPassword: async (email, otp, newPassword) => {
+    return apiRequest('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+        otp,
+        newPassword
+      }),
+    });
+  },
+
+  // Delete account
+  deleteAccount: async (password) => {
+    return apiRequest('/auth/delete-account', {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({
+        password
+      }),
+    });
   },
 };
 
@@ -194,7 +231,7 @@ export const clipdropAPI = {
     const response = await fetch(`${API_URL}/clipdrop/upscale`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)}`,
       },
       body: formData,
       credentials: 'include',

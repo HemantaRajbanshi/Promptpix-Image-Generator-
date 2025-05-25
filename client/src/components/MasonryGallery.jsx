@@ -1,20 +1,40 @@
 import { useState, useEffect } from 'react';
-import { getGalleryItems, removeGalleryItem } from '../services/local-storage/gallery';
+import { useNavigate } from 'react-router-dom';
+import { getUserGalleryItems, removeGalleryItem } from '../services/local-storage/gallery';
 import { downloadImage } from '../utils/download';
+import { useAuth } from '../context/AuthContext';
 
 const MasonryGallery = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [galleryItems, setGalleryItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
 
-  // Load gallery items on component mount
+  // Load gallery items when user changes
   useEffect(() => {
     loadGalleryItems();
+  }, [user]);
+
+  // Listen for gallery updates
+  useEffect(() => {
+    const handleGalleryUpdate = () => {
+      if (user) {
+        loadGalleryItems();
+      }
+    };
+
+    window.addEventListener('galleryUpdated', handleGalleryUpdate);
+    window.addEventListener('storage', handleGalleryUpdate);
 
     // Return cleanup function to revoke any blob URLs when component unmounts
     return () => {
+      window.removeEventListener('galleryUpdated', handleGalleryUpdate);
+      window.removeEventListener('storage', handleGalleryUpdate);
+
       // Clean up any blob URLs that might still be in memory
       if (window._blobUrlsToRevoke && window._blobUrlsToRevoke.length > 0) {
         console.log(`Cleaning up ${window._blobUrlsToRevoke.length} blob URLs on unmount`);
@@ -28,16 +48,27 @@ const MasonryGallery = () => {
         window._blobUrlsToRevoke = [];
       }
     };
-  }, []);
+  }, [user]);
 
-  // Load gallery items from local storage
+  // Load user-specific gallery items from local storage
   const loadGalleryItems = () => {
     setLoading(true);
+    setError(null);
+
     try {
-      const items = getGalleryItems();
+      if (!user?.id && !user?._id) {
+        setGalleryItems([]);
+        setLoading(false);
+        return;
+      }
+
+      const userId = user.id || user._id;
+      const items = getUserGalleryItems(userId);
       setGalleryItems(items);
     } catch (error) {
-      console.error('Error loading gallery items:', error);
+      console.error('Error loading user gallery items:', error);
+      setError('Failed to load your images');
+      setGalleryItems([]);
     } finally {
       setLoading(false);
     }
@@ -195,6 +226,27 @@ const MasonryGallery = () => {
             </div>
           </div>
         </div>
+      ) : error ? (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 text-center">
+          <div className="bg-red-50 dark:bg-red-900/20 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6">
+            <svg className="h-12 w-12 text-red-400 dark:text-red-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Error Loading Gallery</h3>
+          <p className="mt-3 text-gray-600 dark:text-gray-300 max-w-md mx-auto">{error}</p>
+          <div className="mt-8">
+            <button
+              onClick={loadGalleryItems}
+              className="inline-flex items-center px-5 py-3 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 transition-all duration-300 transform hover:scale-105"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Try Again
+            </button>
+          </div>
+        </div>
       ) : displayedItems.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 text-center">
           <div className="bg-purple-50 dark:bg-purple-900/20 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6">
@@ -210,7 +262,7 @@ const MasonryGallery = () => {
           </p>
           <div className="mt-8">
             <button
-              onClick={() => window.location.href = '/dashboard/text-to-image'}
+              onClick={() => navigate('/dashboard/text-to-image')}
               className="inline-flex items-center px-5 py-3 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 transform hover:scale-105"
             >
               <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">

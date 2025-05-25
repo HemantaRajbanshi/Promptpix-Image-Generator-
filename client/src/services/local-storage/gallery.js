@@ -1,7 +1,8 @@
 import { generateId } from './index';
+import { STORAGE_KEYS, IMAGE_CONFIG } from '../../constants';
 
 // Key for storing gallery items in localStorage
-const GALLERY_STORAGE_KEY = 'promptpix_gallery';
+const GALLERY_STORAGE_KEY = STORAGE_KEYS.GALLERY;
 
 /**
  * Get all gallery items
@@ -12,7 +13,6 @@ export const getGalleryItems = () => {
     const items = localStorage.getItem(GALLERY_STORAGE_KEY);
     return items ? JSON.parse(items) : [];
   } catch (error) {
-    console.error('Error getting gallery items:', error);
     return [];
   }
 };
@@ -56,9 +56,6 @@ export const saveGalleryItems = (items) => {
 
       // Strategy 3: Further reduce image quality for all items
       () => {
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('Reducing image quality...');
-        }
         const reducedQualityItems = itemsToSave.map(item => {
           // Skip items without imageData
           if (!item.imageData || !item.imageData.startsWith('data:image')) {
@@ -99,9 +96,6 @@ export const saveGalleryItems = (items) => {
 
       // Strategy 4: Last resort - keep only the most recent 5 items with minimal data
       () => {
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('Last resort: keeping only 5 most recent items with minimal data');
-        }
         const minimalItems = items.slice(0, 5).map(item => ({
           id: item.id,
           createdAt: item.createdAt,
@@ -273,6 +267,7 @@ const blobToBase64 = async (blob, options = {}) => {
  * @param {string} item.imageUrl - URL or data URL of the image
  * @param {string} item.prompt - Prompt used to generate the image (optional)
  * @param {string} item.type - Type of image (text-to-image, upscale, etc.)
+ * @param {string} item.userId - User ID who created the image
  * @param {Blob} item.blob - Image blob for downloading (optional)
  * @returns {Promise<Object>} Promise resolving to the added gallery item with ID and timestamp
  */
@@ -280,10 +275,11 @@ export const addGalleryItem = async (item) => {
   try {
     const items = getGalleryItems();
 
-    // Create new item with ID and timestamp
+    // Create new item with ID, timestamp, and user association
     const newItem = {
       id: generateId(),
       createdAt: new Date().toISOString(),
+      userId: item.userId || null, // Associate with user
       ...item
     };
 
@@ -334,7 +330,6 @@ export const addGalleryItem = async (item) => {
 
     if (!saveSuccess) {
       // If saving failed, try to save just this item
-      console.warn('Failed to save all items, trying to save just the new item');
       const singleItemSuccess = saveGalleryItems([newItem]);
 
       if (!singleItemSuccess) {
@@ -362,6 +357,57 @@ export const addGalleryItem = async (item) => {
 };
 
 /**
+ * Get gallery items for a specific user
+ * @param {string} userId - User ID to filter by
+ * @returns {Array} Array of gallery items for the user
+ */
+export const getUserGalleryItems = (userId) => {
+  try {
+    if (!userId) return [];
+
+    const items = getGalleryItems();
+    return items
+      .filter(item => item.userId === userId)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // Newest first
+  } catch (error) {
+    console.error('Error getting user gallery items:', error);
+    return [];
+  }
+};
+
+/**
+ * Get user statistics from gallery items
+ * @param {string} userId - User ID to calculate stats for
+ * @returns {Object} User statistics object
+ */
+export const getUserStatistics = (userId) => {
+  try {
+    if (!userId) return { imagesGenerated: 0, imagesEdited: 0 };
+
+    const userItems = getUserGalleryItems(userId);
+
+    const imagesGenerated = userItems.filter(item =>
+      item.type === 'text-to-image' ||
+      item.type === 'upscale' ||
+      item.type === 'remove-bg' ||
+      item.type === 'uncrop'
+    ).length;
+
+    const imagesEdited = userItems.filter(item =>
+      item.type === 'image-editor'
+    ).length;
+
+    return {
+      imagesGenerated,
+      imagesEdited,
+      totalImages: userItems.length
+    };
+  } catch (error) {
+    return { imagesGenerated: 0, imagesEdited: 0, totalImages: 0 };
+  }
+};
+
+/**
  * Remove an item from the gallery
  * @param {string} itemId - ID of the item to remove
  * @returns {boolean} Success status
@@ -376,7 +422,6 @@ export const removeGalleryItem = (itemId) => {
 
     return true;
   } catch (error) {
-    console.error('Error removing gallery item:', error);
     return false;
   }
 };

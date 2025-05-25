@@ -83,15 +83,20 @@ cd promptpix
 The easiest way to set up the entire application:
 
 ```bash
-# Run the installation script to install all dependencies
-node install-deps.js
+# Install server dependencies
+cd server
+npm install
+
+# Install client dependencies
+cd ../client
+npm install
 
 # Ensure MongoDB is running
 # For local MongoDB: mongod --dbpath /path/to/data/directory
 # For MongoDB Atlas: Make sure your connection string is in server/.env
 
 # Start the server
-cd server
+cd ../server
 npm run dev
 
 # In a new terminal, start the client
@@ -142,18 +147,23 @@ npm run dev
 For a quick start with both frontend and backend:
 
 ```bash
-# Install dependencies for both client and server
-node install-deps.js
+# Install server dependencies
+cd server
+npm install
+
+# Install client dependencies
+cd ../client
+npm install
 
 # Start the MongoDB server (if not running)
 # This step depends on your MongoDB installation method
 
 # Start the backend server
-cd server
+cd ../server
 npm run dev
 
 # In a new terminal, start the frontend
-cd client
+cd ../client
 npm run dev
 ```
 

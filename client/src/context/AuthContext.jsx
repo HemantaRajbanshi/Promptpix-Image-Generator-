@@ -9,10 +9,12 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [creditsLoading, setCreditsLoading] = useState(false);
 
   // Add a debounce timer reference to prevent too many update requests
   const updateTimerRef = useRef(null);
   const lastUpdateTimeRef = useRef(0);
+  const refreshIntervalRef = useRef(null);
 
   useEffect(() => {
     // Check if user is logged in (token exists)
@@ -485,10 +487,64 @@ export const AuthProvider = ({ children }) => {
     return currentCredits >= amount;
   };
 
+  // Function to refresh user credits specifically
+  const refreshCredits = async () => {
+    if (!user || creditsLoading) return;
+
+    setCreditsLoading(true);
+    try {
+      const response = await userAPI.getCurrentUser();
+      if (response && response.data && response.data.user) {
+        setUser(prevUser => ({
+          ...prevUser,
+          credits: response.data.user.credits || 0
+        }));
+
+        // Dispatch a custom event to notify components of successful refresh
+        window.dispatchEvent(new CustomEvent('creditsRefreshed', {
+          detail: { credits: response.data.user.credits || 0 }
+        }));
+
+        return true; // Indicate success
+      }
+      return false;
+    } catch (err) {
+      console.error('Error refreshing credits:', err);
+      // Don't set error for credit refresh failures to avoid disrupting UX
+      return false;
+    } finally {
+      setCreditsLoading(false);
+    }
+  };
+
+  // Set up automatic credit refresh when user is authenticated
+  useEffect(() => {
+    if (user && !loading) {
+      // Refresh credits every 30 seconds
+      refreshIntervalRef.current = setInterval(refreshCredits, 30000);
+
+      return () => {
+        if (refreshIntervalRef.current) {
+          clearInterval(refreshIntervalRef.current);
+        }
+      };
+    }
+  }, [user, loading]);
+
+  // Clean up interval on unmount
+  useEffect(() => {
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, []);
+
   const value = {
     user,
     loading,
     error,
+    creditsLoading,
     login,
     signup,
     logout,
@@ -496,6 +552,7 @@ export const AuthProvider = ({ children }) => {
     addCredits,
     useCredits,
     hasEnoughCredits,
+    refreshCredits,
     fetchCurrentUser, // Expose this function to components
     isAuthenticated: !!user,
   };

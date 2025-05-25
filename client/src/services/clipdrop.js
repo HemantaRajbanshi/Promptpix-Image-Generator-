@@ -31,28 +31,20 @@ export const generateImage = async (prompt, options = {}) => {
   const height = 1024;
 
   try {
-    console.log('Generating image with prompt:', prompt);
-    console.log('Resolution:', `${width}x${height}`);
-
     // Call the secure API proxy with just the prompt
     const imageBlob = await clipdropAPI.textToImage(prompt);
-    console.log('Received image blob:', imageBlob.size, 'bytes, type:', imageBlob.type);
-
     return imageBlob;
   } catch (error) {
-    console.error('Error generating image:', error);
-
-    // Show more detailed error information
+    // Enhanced error handling for better user experience
     if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-      console.error('Network error: Check if the server is running and API key is configured');
+      error.message = 'Network error: Check if the server is running and API key is configured';
     } else if (error.message.includes('401') || error.message.includes('403')) {
-      console.error('Authentication error: API key may be invalid or expired');
+      error.message = 'Authentication error: API key may be invalid or expired';
     } else if (error.message.includes('429')) {
-      console.error('Rate limit exceeded: Too many requests to the API');
+      error.message = 'Rate limit exceeded: Too many requests to the API';
     }
 
     // Create fallback image if API call fails
-    console.log('Creating fallback image...');
 
     // Create canvas for fallback image with the requested dimensions
     const canvas = document.createElement('canvas');
@@ -102,18 +94,11 @@ export const upscaleImage = async (imageFile) => {
   const targetHeight = Math.min(imageFile.height * 2 || 2048, 4096);
 
   try {
-    console.log('Upscaling image:', imageFile.name);
-
     // Call the secure API proxy
     const imageBlob = await clipdropAPI.upscaleImage(imageFile, targetWidth, targetHeight);
-    console.log('Received image blob:', imageBlob.size, 'bytes, type:', imageBlob.type);
-
     return imageBlob;
   } catch (error) {
-    console.error('Error upscaling image:', error);
-
     // Create fallback upscaled image
-    console.log('Creating fallback upscaled image...');
 
     // Load the original image
     const imageUrl = await readFileAsDataURL(imageFile);
@@ -219,18 +204,11 @@ export const uncropImage = async (imageFile) => {
  */
 export const removeBackground = async (imageFile) => {
   try {
-    console.log('Removing background from image:', imageFile.name);
-
     // Call the secure API proxy
     const imageBlob = await clipdropAPI.removeBackground(imageFile);
-    console.log('Received image blob:', imageBlob.size, 'bytes, type:', imageBlob.type);
-
     return imageBlob;
   } catch (error) {
-    console.error('Error removing background:', error);
-
     // Create fallback background-removed image
-    console.log('Creating fallback background-removed image...');
 
     // Load the original image
     const imageUrl = await readFileAsDataURL(imageFile);

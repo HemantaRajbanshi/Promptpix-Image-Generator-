@@ -16,4 +16,12 @@ router.post('/signup', authController.signup);
 router.post('/login', loginLimiter, authController.login);
 router.get('/logout', authController.logout);
 
+// Password management routes
+router.post('/update-password', authController.protect, authController.updatePassword);
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/reset-password', authController.resetPassword);
+
+// Account management routes
+router.delete('/delete-account', authController.protect, authController.deleteAccount);
+
 module.exports = router;

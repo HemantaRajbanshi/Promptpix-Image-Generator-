@@ -1,5 +1,15 @@
 /**
- * Download an image from a blob in high quality at 1024x1024 resolution
+ * Download utility for images
+ * Handles downloading images with standardized resolution and format
+ */
+
+import { IMAGE_CONFIG } from '../constants';
+
+// Target resolution for downloads
+const TARGET_RESOLUTION = IMAGE_CONFIG.TARGET_RESOLUTION;
+
+/**
+ * Download an image from a blob in high quality at specified resolution
  * @param {Blob|string} blobOrUrl - The image blob or blob URL
  * @param {string} filename - The filename to save as
  */
@@ -13,7 +23,6 @@ export const downloadImage = (blobOrUrl, filename) => {
           .then(response => response.blob())
           .then(blob => downloadImage(blob, filename))
           .catch(error => {
-            console.error('Error fetching blob URL:', error);
             alert('Failed to download image. Please try again.');
           });
         return;
@@ -58,11 +67,9 @@ export const downloadImage = (blobOrUrl, filename) => {
 
     // Handle errors
     img.onerror = () => {
-      console.error('Failed to load image for download');
       alert('Failed to prepare image for download. Please try again.');
 
       // Fallback to direct download (original resolution)
-      console.warn('Falling back to original resolution download');
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -186,11 +193,7 @@ export const downloadImage = (blobOrUrl, filename) => {
 
     // Set the image source to trigger the load
     img.src = blobUrl;
-
-    // Log the standardization process
-    console.log(`Converting image to high-quality PNG format (${TARGET_RESOLUTION}x${TARGET_RESOLUTION})`);
   } catch (error) {
-    console.error('Error in downloadImage:', error);
     alert('Failed to download image. Please try again.');
   }
 };

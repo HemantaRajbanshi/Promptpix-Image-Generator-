@@ -1,61 +1,19 @@
-import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from '../context/ThemeContext';
 
 const DarkModeToggle = () => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const { isDarkMode, toggleTheme, isInitialized } = useTheme();
 
-  // Check for user's preference on component mount
-  useEffect(() => {
-    // Add transition class to HTML element for smooth transitions
-    document.documentElement.classList.add('transition-colors', 'duration-300');
-
-    // Check if user has a saved preference
-    const savedTheme = localStorage.getItem('theme');
-
-    if (savedTheme === 'dark' ||
-        (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      setIsDarkMode(true);
-      document.documentElement.classList.add('dark');
-    } else {
-      setIsDarkMode(false);
-      document.documentElement.classList.remove('dark');
-    }
-
-    // Listen for system preference changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e) => {
-      if (!localStorage.getItem('theme')) {
-        if (e.matches) {
-          setIsDarkMode(true);
-          document.documentElement.classList.add('dark');
-        } else {
-          setIsDarkMode(false);
-          document.documentElement.classList.remove('dark');
-        }
-      }
-    };
-
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
-
-  const toggleDarkMode = () => {
-    if (isDarkMode) {
-      // Switch to light mode
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-      setIsDarkMode(false);
-    } else {
-      // Switch to dark mode
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-      setIsDarkMode(true);
-    }
-  };
+  // Don't render until theme is initialized to prevent flash
+  if (!isInitialized) {
+    return (
+      <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse" />
+    );
+  }
 
   return (
     <motion.button
-      onClick={toggleDarkMode}
+      onClick={toggleTheme}
       className="relative p-2 rounded-full bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900 dark:to-blue-900 text-gray-700 dark:text-gray-200 hover:shadow-md transition-all"
       whileHover={{ scale: 1.1, rotate: isDarkMode ? -15 : 15 }}
       whileTap={{ scale: 0.9 }}

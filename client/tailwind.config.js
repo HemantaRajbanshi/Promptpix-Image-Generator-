@@ -8,44 +8,158 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter var', 'system-ui', 'sans-serif'],
-        display: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        // Material Design 3 typography system
+        sans: ['Roboto Flex', 'Inter var', 'system-ui', 'sans-serif'],
+        display: ['Roboto Flex', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
+        // Material Design type scale aliases
+        'display-large': ['Roboto Flex', 'system-ui', 'sans-serif'],
+        'display-medium': ['Roboto Flex', 'system-ui', 'sans-serif'],
+        'display-small': ['Roboto Flex', 'system-ui', 'sans-serif'],
+        'headline-large': ['Roboto Flex', 'system-ui', 'sans-serif'],
+        'headline-medium': ['Roboto Flex', 'system-ui', 'sans-serif'],
+        'headline-small': ['Roboto Flex', 'system-ui', 'sans-serif'],
+        'title-large': ['Roboto Flex', 'system-ui', 'sans-serif'],
+        'title-medium': ['Roboto Flex', 'system-ui', 'sans-serif'],
+        'title-small': ['Roboto Flex', 'system-ui', 'sans-serif'],
       },
       colors: {
+        // Material Design 3 color system
         primary: {
-          50: '#f5f3ff',
-          100: '#ede9fe',
-          200: '#ddd6fe',
-          300: '#c4b5fd',
-          400: '#a78bfa',
-          500: '#8b5cf6',
-          600: '#7c3aed',
-          700: '#6d28d9',
-          800: '#5b21b6',
-          900: '#4c1d95',
-          950: '#2e1065',
+          0: '#000000',
+          10: '#21005E',
+          20: '#381E72',
+          30: '#4F378B',
+          40: '#6750A4',
+          50: '#7F67BE',
+          60: '#9A82DB',
+          70: '#B69DF8',
+          80: '#D0BCFF',
+          90: '#EADDFF',
+          95: '#F6EDFF',
+          99: '#FFFBFF',
+          100: '#FFFFFF',
         },
-        // Modern UI color palette
+        secondary: {
+          0: '#000000',
+          10: '#1D192B',
+          20: '#332D41',
+          30: '#4A4458',
+          40: '#625B71',
+          50: '#7A7289',
+          60: '#958DA5',
+          70: '#B0A7C0',
+          80: '#CCC2DC',
+          90: '#E8DEF8',
+          95: '#F6EDFF',
+          99: '#FFFBFF',
+          100: '#FFFFFF',
+        },
+        tertiary: {
+          0: '#000000',
+          10: '#31111D',
+          20: '#492532',
+          30: '#633B48',
+          40: '#7D5260',
+          50: '#986977',
+          60: '#B58392',
+          70: '#D29DAC',
+          80: '#EFB8C8',
+          90: '#FFD8E4',
+          95: '#FFECF1',
+          99: '#FFFBFF',
+          100: '#FFFFFF',
+        },
+        error: {
+          0: '#000000',
+          10: '#410E0B',
+          20: '#601410',
+          30: '#8C1D18',
+          40: '#B3261E',
+          50: '#DC362E',
+          60: '#E46962',
+          70: '#EC928E',
+          80: '#F2B8B5',
+          90: '#F9DEDC',
+          95: '#FCEEEE',
+          99: '#FFFBF9',
+          100: '#FFFFFF',
+        },
+        neutral: {
+          0: '#000000',
+          10: '#1C1B1F',
+          20: '#313033',
+          30: '#484649',
+          40: '#605D62',
+          50: '#787579',
+          60: '#939094',
+          70: '#AEAAAE',
+          80: '#C9C5CA',
+          90: '#E6E1E5',
+          95: '#F4EFF4',
+          99: '#FFFBFF',
+          100: '#FFFFFF',
+        },
+        // Material Design 3 surface and container colors
+        surface: {
+          DEFAULT: '#FFFBFF', // surface light
+          dim: '#DED8E1',     // surface-dim light
+          bright: '#FFFBFF',  // surface-bright light
+          container: {
+            lowest: '#FFFFFF',  // surface-container-lowest light
+            low: '#F7F2FA',     // surface-container-low light
+            DEFAULT: '#F3EDF7', // surface-container light
+            high: '#ECE6F0',    // surface-container-high light
+            highest: '#E6E0E9', // surface-container-highest light
+          },
+        },
+        // Material Design 3 on-surface colors
+        'on-surface': {
+          DEFAULT: '#1C1B1F',    // on-surface light
+          variant: '#49454F',    // on-surface-variant light
+          inverse: '#F4EFF4',    // inverse-on-surface light
+        },
+        // Material Design 3 on-primary colors
+        'on-primary': {
+          DEFAULT: '#FFFFFF',    // on-primary
+          container: '#21005E',  // on-primary-container
+          inverse: '#D0BCFF',    // inverse-primary
+        },
+        // Material Design 3 on-secondary colors
+        'on-secondary': {
+          DEFAULT: '#FFFFFF',    // on-secondary
+          container: '#1D192B',  // on-secondary-container
+        },
+        // Material Design 3 on-tertiary colors
+        'on-tertiary': {
+          DEFAULT: '#FFFFFF',    // on-tertiary
+          container: '#31111D',  // on-tertiary-container
+        },
+        // Material Design 3 on-error colors
+        'on-error': {
+          DEFAULT: '#FFFFFF',    // on-error
+          container: '#410E0B',  // on-error-container
+        },
+        // Keep the modern palette for backward compatibility
         modern: {
           bg: {
-            light: '#f9fafb',
-            dark: '#111827',
+            light: '#FFFBFF', // Updated to Material 3 surface
+            dark: '#1C1B1F',  // Updated to Material 3 neutral-10
           },
           sidebar: {
-            light: '#ffffff',
-            dark: '#1f2937',
+            light: '#F3EDF7', // Updated to Material 3 surface-container
+            dark: '#313033',  // Updated to Material 3 neutral-20
           },
           card: {
-            light: '#ffffff',
-            dark: '#1f2937',
+            light: '#F7F2FA', // Updated to Material 3 surface-container-low
+            dark: '#313033',  // Updated to Material 3 neutral-20
           },
           accent: {
-            purple: '#8b5cf6',
-            blue: '#3b82f6',
-            indigo: '#6366f1',
-            teal: '#14b8a6',
-            emerald: '#10b981',
+            purple: '#6750A4', // Updated to Material 3 primary-40
+            blue: '#6750A4',   // Updated to Material 3 primary-40
+            indigo: '#7F67BE', // Updated to Material 3 primary-50
+            teal: '#7D5260',   // Updated to Material 3 tertiary-40
+            emerald: '#625B71', // Updated to Material 3 secondary-40
           },
         },
       },
@@ -101,15 +215,32 @@ export default {
         },
       },
       boxShadow: {
-        'glow': '0 0 15px rgba(139, 92, 246, 0.5)',
-        'glow-lg': '0 0 25px rgba(139, 92, 246, 0.6)',
+        // Material Design 3 elevation system
+        'elevation-0': 'none',
+        'elevation-1': '0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.30)',
+        'elevation-2': '0px 2px 6px 2px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.30)',
+        'elevation-3': '0px 4px 8px 3px rgba(0, 0, 0, 0.15), 0px 1px 3px 0px rgba(0, 0, 0, 0.30)',
+        'elevation-4': '0px 6px 10px 4px rgba(0, 0, 0, 0.15), 0px 2px 3px 0px rgba(0, 0, 0, 0.30)',
+        'elevation-5': '0px 8px 12px 6px rgba(0, 0, 0, 0.15), 0px 4px 4px 0px rgba(0, 0, 0, 0.30)',
+        // Keep existing shadows for backward compatibility
+        'glow': '0 0 15px rgba(103, 80, 164, 0.5)', // Updated to primary-40
+        'glow-lg': '0 0 25px rgba(103, 80, 164, 0.6)', // Updated to primary-40
         'soft': '0 2px 15px rgba(0, 0, 0, 0.05)',
         'soft-lg': '0 5px 25px rgba(0, 0, 0, 0.07)',
         'inner-soft': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
-        'modern': '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01)',
-        'modern-lg': '0 20px 35px -10px rgba(0, 0, 0, 0.1), 0 10px 15px -3px rgba(0, 0, 0, 0.05)',
+        'modern': '0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.30)', // Updated to elevation-1
+        'modern-lg': '0px 4px 8px 3px rgba(0, 0, 0, 0.15), 0px 1px 3px 0px rgba(0, 0, 0, 0.30)', // Updated to elevation-3
       },
       borderRadius: {
+        // Material Design 3 shape system
+        'none': '0px',
+        'extra-small': '4px',
+        'small': '8px',
+        'medium': '12px',
+        'large': '16px',
+        'extra-large': '28px',
+        'full': '9999px',
+        // Keep existing border radius for backward compatibility
         'xl': '0.75rem',
         '2xl': '1rem',
         '3xl': '1.5rem',
@@ -117,11 +248,29 @@ export default {
       transitionProperty: {
         'height': 'height',
         'spacing': 'margin, padding',
+        'shadow': 'box-shadow',
+        'all': 'all',
       },
       transitionDuration: {
+        // Material Design 3 motion durations
+        '0': '0ms',
+        'extra-short': '50ms',
+        'short': '100ms',
+        'medium': '250ms',
+        'long': '400ms',
+        'extra-long': '500ms',
+        // Keep existing durations
         '400': '400ms',
       },
       transitionTimingFunction: {
+        // Material Design 3 easing curves
+        'standard': 'cubic-bezier(0.2, 0.0, 0, 1.0)',
+        'standard-accelerate': 'cubic-bezier(0.3, 0.0, 1.0, 1.0)',
+        'standard-decelerate': 'cubic-bezier(0.0, 0.0, 0.0, 1.0)',
+        'emphasized': 'cubic-bezier(0.2, 0.0, 0, 1.0)',
+        'emphasized-accelerate': 'cubic-bezier(0.3, 0.0, 0.8, 0.15)',
+        'emphasized-decelerate': 'cubic-bezier(0.05, 0.7, 0.1, 1.0)',
+        // Keep existing timing functions
         'bounce-in': 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
         'out-quint': 'cubic-bezier(0.22, 1, 0.36, 1)',
       },

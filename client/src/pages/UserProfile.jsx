@@ -1,21 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { getGalleryItems, addGalleryItem } from '../services/local-storage/gallery';
+import { getUserGalleryItems, getUserStatistics, addGalleryItem } from '../services/local-storage/gallery';
 import { debounce } from '../utils/debounce';
 
 const UserProfile = () => {
   const { user, updateUser } = useAuth();
+  const navigate = useNavigate();
 
-  // Form state
+  // Form state - removed password fields
   const [formData, setFormData] = useState({
     displayName: '',
     email: '',
     bio: '',
-    profilePicture: '',
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
+    profilePicture: ''
   });
 
   // UI state
@@ -24,6 +23,20 @@ const UserProfile = () => {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
+  // Statistics state
+  const [statistics, setStatistics] = useState({
+    imagesGenerated: 0,
+    imagesEdited: 0,
+    totalImages: 0
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [statsError, setStatsError] = useState(null);
+
+  // Gallery state
+  const [userGalleryItems, setUserGalleryItems] = useState([]);
+  const [isLoadingGallery, setIsLoadingGallery] = useState(true);
+  const [galleryError, setGalleryError] = useState(null);
+
   // Track original user data for differential updates
   const originalUserRef = useRef(null);
   // Track if form has unsaved changes
@@ -31,69 +44,50 @@ const UserProfile = () => {
   // Track pending updates to batch them
   const pendingUpdatesRef = useRef({});
 
-  // Calculate user statistics from gallery items
-  const calculateUserStats = () => {
-    if (!user) return;
+  // Load user statistics and gallery items
+  const loadUserData = useCallback(async () => {
+    if (!user?.id && !user?._id) {
+      setIsLoadingStats(false);
+      setIsLoadingGallery(false);
+      return;
+    }
+
+    const userId = user.id || user._id;
 
     try {
-      // Get all gallery items
-      const galleryItems = getGalleryItems();
-      console.log('Gallery items:', galleryItems);
+      setIsLoadingStats(true);
+      setIsLoadingGallery(true);
+      setStatsError(null);
+      setGalleryError(null);
 
-      // Count images by type
-      const generatedCount = galleryItems.filter(item =>
-        item.type === 'text-to-image' ||
-        item.type === 'upscale' ||
-        item.type === 'remove-bg' ||
-        item.type === 'uncrop'
-      ).length;
+      // Load user's gallery items
+      const userItems = getUserGalleryItems(userId);
+      setUserGalleryItems(userItems);
 
-      const editedCount = galleryItems.filter(item =>
-        item.type === 'image-editor'
-      ).length;
+      // Calculate statistics from user's items
+      const stats = getUserStatistics(userId);
+      setStatistics(stats);
 
-      console.log('Current user stats:', {
-        current: {
-          imagesGenerated: user.imagesGenerated,
-          imagesEdited: user.imagesEdited
-        },
-        calculated: {
-          imagesGenerated: generatedCount,
-          imagesEdited: editedCount
-        }
-      });
-
-      // Update user with statistics
-      if (user.imagesGenerated !== generatedCount || user.imagesEdited !== editedCount) {
-        console.log('Stats need updating');
-
-        // Create a copy of the user object with updated statistics
+      // Update user object with real-time statistics if they differ
+      if (user.imagesGenerated !== stats.imagesGenerated || user.imagesEdited !== stats.imagesEdited) {
         const updatedUser = {
           ...user,
-          imagesGenerated: generatedCount,
-          imagesEdited: editedCount
+          imagesGenerated: stats.imagesGenerated,
+          imagesEdited: stats.imagesEdited
         };
-
-        // Update the user in the database
-        console.log('Calling updateUser with:', {
-          imagesGenerated: generatedCount,
-          imagesEdited: editedCount
-        });
-
         updateUser(updatedUser);
-
-        // Log the update for debugging
-        console.log('Updated user statistics:', {
-          imagesGenerated: generatedCount,
-          imagesEdited: editedCount
-        });
-      } else {
-        console.log('Stats already up to date');
       }
+
+      setIsLoadingStats(false);
+      setIsLoadingGallery(false);
     } catch (error) {
-      console.error('Error calculating user statistics:', error);
+      console.error('Error loading user data:', error);
+      setStatsError('Failed to load statistics');
+      setGalleryError('Failed to load gallery');
+      setIsLoadingStats(false);
+      setIsLoadingGallery(false);
     }
-  };
+  }, [user, updateUser]);
 
   // Load user data and calculate statistics
   useEffect(() => {
@@ -106,70 +100,48 @@ const UserProfile = () => {
         displayName: user.displayName || '',
         email: user.email || '',
         bio: user.bio || '',
-        profilePicture: user.profilePicture || '',
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
+        profilePicture: user.profilePicture || ''
       });
 
       // Reset unsaved changes state and pending updates
       setHasUnsavedChanges(false);
       pendingUpdatesRef.current = {};
 
-      // Calculate statistics
-      calculateUserStats();
+      // Load user data and statistics
+      loadUserData();
     } else {
       // Check if there's a token but no user data
       const token = localStorage.getItem('token');
       if (token) {
-        // Force a page reload after a short delay to try to fetch user data again
+        // Try to refresh user data after a short delay
         setTimeout(() => {
-          window.location.reload();
+          // Instead of reloading, try to fetch user data again
+          const { fetchCurrentUser } = useAuth();
+          fetchCurrentUser();
         }, 2000);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, loadUserData]);
 
-  // Recalculate statistics when the component mounts
+  // Refresh data when user creates new images (listen for storage changes)
   useEffect(() => {
-    if (user) {
-      // Add some test gallery items if none exist
-      const galleryItems = getGalleryItems();
-      if (galleryItems.length === 0) {
-
-        // Add test items
-        const testItems = [
-          {
-            type: 'text-to-image',
-            prompt: 'Test generated image 1',
-            imageData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
-          },
-          {
-            type: 'text-to-image',
-            prompt: 'Test generated image 2',
-            imageData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
-          },
-          {
-            type: 'image-editor',
-            prompt: 'Test edited image',
-            imageData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
-          }
-        ];
-
-        // Add each test item to the gallery
-        testItems.forEach(async (item) => {
-          await addGalleryItem(item);
-        });
-
-        console.log('Added test gallery items');
+    const handleStorageChange = () => {
+      if (user) {
+        loadUserData();
       }
+    };
 
-      // Calculate statistics
-      calculateUserStats();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Listen for storage changes to update statistics in real-time
+    window.addEventListener('storage', handleStorageChange);
+
+    // Also listen for custom events when images are added
+    window.addEventListener('galleryUpdated', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('galleryUpdated', handleStorageChange);
+    };
+  }, [user, loadUserData]);
 
   // Create a debounced update function that only sends changes after 500ms of inactivity
   const debouncedUpdateUser = useCallback(
@@ -296,13 +268,7 @@ const UserProfile = () => {
         throw new Error('Failed to save changes. Please try again.');
       }
 
-      // Clear password fields
-      setFormData(prevData => ({
-        ...prevData,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      }));
+
     } catch (error) {
       setMessage({
         type: 'error',
@@ -407,18 +373,19 @@ const UserProfile = () => {
               </p>
               <button
                 onClick={() => {
-                  // Force refresh user data
-                  window.location.reload();
+                  // Try to refresh user data
+                  const { fetchCurrentUser } = useAuth();
+                  fetchCurrentUser();
                 }}
                 className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
               >
-                Refresh Page
+                Refresh Data
               </button>
               <button
                 onClick={() => {
                   // Clear token and redirect to login
                   localStorage.removeItem('token');
-                  window.location.href = '/login';
+                  navigate('/login');
                 }}
                 className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
               >
@@ -427,7 +394,7 @@ const UserProfile = () => {
             </div>
           ) : (
             <button
-              onClick={() => window.location.href = '/login'}
+              onClick={() => navigate('/login')}
               className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
             >
               Go to Login
@@ -439,23 +406,44 @@ const UserProfile = () => {
   }
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-white dark:bg-gray-900 py-8 px-4 sm:px-6 lg:px-8">
       <motion.div
-        className="max-w-4xl mx-auto"
+        className="max-w-5xl mx-auto"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
+        {/* Modern Profile Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-10"
+        >
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
+                My Profile
+              </h1>
+              <p className="text-gray-600 dark:text-gray-300 text-lg">Manage your account information and preferences</p>
+            </div>
+          </div>
+        </motion.div>
+
         {/* Profile header card */}
         <motion.div
-          className="bg-white dark:bg-gray-800 shadow-xl rounded-2xl overflow-hidden mb-8 border border-gray-100 dark:border-gray-700"
+          className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/20 shadow-2xl overflow-hidden mb-8"
           variants={cardVariants}
           initial="hidden"
           animate="visible"
           whileHover="hover"
         >
-          {/* Background pattern - toned down */}
-          <div className="relative bg-gradient-to-r from-purple-700/80 to-indigo-700/80 px-6 py-12 overflow-hidden">
+          {/* Background pattern - modern gradient */}
+          <div className="relative bg-gradient-to-r from-blue-600/90 to-purple-600/90 px-8 py-16 overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-full opacity-5">
               <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                 <defs>
@@ -543,49 +531,77 @@ const UserProfile = () => {
             </div>
           </div>
 
-          <div className="p-6">
+          <div className="p-8 md:p-10">
+            {/* Modern Message Display */}
             {message.text && (
               <motion.div
-                className={`mb-6 p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400'}`}
+                className={`mb-8 p-6 rounded-2xl border ${
+                  message.type === 'success'
+                    ? 'bg-green-50 border-green-200 text-green-700'
+                    : 'bg-red-50 border-red-200 text-red-700'
+                }`}
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                {message.text}
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 mr-4">
+                    {message.type === 'success' ? (
+                      <svg className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                  <p className="font-medium">{message.text}</p>
+                  <button
+                    type="button"
+                    onClick={() => setMessage({ type: '', text: '' })}
+                    className="ml-auto p-2 rounded-xl hover:bg-white/50 transition-colors"
+                  >
+                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
               </motion.div>
             )}
 
             {isEditing ? (
-              <form onSubmit={handleSubmit}>
-                <div className="flex justify-between items-center mb-6">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Edit Profile</h2>
-                    {hasUnsavedChanges && (
-                      <span className="text-xs px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded-full">
-                        Unsaved changes
-                      </span>
-                    )}
+              <div>
+                {/* Modern Header */}
+                <div className="flex items-center space-x-4 mb-8">
+                  <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditing(false)}
-                    className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </button>
+                  <div className="flex-1">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Edit Profile</h2>
+                    <p className="text-gray-600 dark:text-gray-300">Update your personal information and preferences</p>
+                  </div>
+                  {hasUnsavedChanges && (
+                    <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+                      Unsaved changes
+                    </span>
+                  )}
                 </div>
-                <div className="space-y-6">
+
+                <form onSubmit={handleSubmit}>
+                <div className="space-y-8">
                   {/* Profile Picture Upload */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <div className="bg-gray-50 rounded-3xl p-6">
+                    <label className="block text-sm font-semibold text-gray-700 mb-4">
                       Profile Picture
                     </label>
-                    <div className="flex items-center space-x-6">
-                      <div className="relative h-20 w-20 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+                    <div className="flex items-center space-x-8">
+                      <div className="relative h-24 w-24 rounded-full overflow-hidden bg-gradient-to-br from-blue-100 to-purple-100 border-4 border-white shadow-lg">
                         {isUploadingPhoto && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/30 z-10">
-                            <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+                            <svg className="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
@@ -598,26 +614,27 @@ const UserProfile = () => {
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <div className="h-full w-full flex items-center justify-center text-2xl font-bold text-gray-400 dark:text-gray-500">
+                          <div className="h-full w-full flex items-center justify-center text-2xl font-bold text-gray-600">
                             {formData.displayName?.charAt(0).toUpperCase() || 'U'}
                           </div>
                         )}
                       </div>
 
-                      <div>
+                      <div className="flex-1">
                         <motion.button
                           type="button"
-                          className="py-2 px-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center"
+                          className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-2xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg flex items-center space-x-2"
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => document.getElementById('profile-picture-edit').click()}
                         >
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
-                          Change Photo
+                          <span>Change Photo</span>
                         </motion.button>
+                        <p className="text-sm text-gray-500 mt-2">Upload a new profile picture (JPG, PNG, GIF)</p>
                         <input
                           type="file"
                           id="profile-picture-edit"
@@ -650,217 +667,192 @@ const UserProfile = () => {
                     </div>
                   </div>
 
-                  <div>
-                    <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {/* Display Name */}
+                  <div className="space-y-2">
+                    <label htmlFor="displayName" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
                       Display Name
                     </label>
-                    <div className="mt-1">
+                    <div className="relative">
                       <input
                         type="text"
                         name="displayName"
                         id="displayName"
                         value={formData.displayName}
                         onChange={handleChange}
-                        className="py-3 px-4 block w-full shadow-sm focus:ring-purple-500 focus:border-purple-500 border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-4 py-4 pl-12 rounded-2xl border-2 border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                        placeholder="Enter your display name"
                       />
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center">
+                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      </div>
                     </div>
                   </div>
 
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Email
+                  {/* Email */}
+                  <div className="space-y-2">
+                    <label htmlFor="email" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Email Address
                     </label>
-                    <div className="mt-1">
+                    <div className="relative">
                       <input
                         type="email"
                         name="email"
                         id="email"
                         value={formData.email}
                         disabled
-                        className="py-3 px-4 block w-full shadow-sm border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                        className="w-full px-4 py-4 pl-12 rounded-2xl border-2 border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                       />
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Email cannot be changed</p>
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center">
+                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                        </svg>
+                      </div>
+                      <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
+                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </div>
                     </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Email cannot be changed for security reasons</p>
                   </div>
 
-                  <div>
-                    <label htmlFor="bio" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {/* Bio */}
+                  <div className="space-y-2">
+                    <label htmlFor="bio" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
                       Bio
                     </label>
-                    <div className="mt-1">
+                    <div className="relative">
                       <textarea
                         name="bio"
                         id="bio"
-                        rows={3}
+                        rows={4}
                         value={formData.bio}
                         onChange={handleChange}
-                        className="py-3 px-4 block w-full shadow-sm focus:ring-purple-500 focus:border-purple-500 border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-4 py-4 rounded-2xl border-2 border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none"
+                        placeholder="Tell us about yourself..."
                       />
-                    </div>
-                  </div>
-
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Change Password</h3>
-
-                    <div className="space-y-4">
-                      <div>
-                        <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Current Password
-                        </label>
-                        <div className="mt-1">
-                          <input
-                            type="password"
-                            name="currentPassword"
-                            id="currentPassword"
-                            value={formData.currentPassword}
-                            onChange={handleChange}
-                            className="py-3 px-4 block w-full shadow-sm focus:ring-purple-500 focus:border-purple-500 border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                          New Password
-                        </label>
-                        <div className="mt-1">
-                          <input
-                            type="password"
-                            name="newPassword"
-                            id="newPassword"
-                            value={formData.newPassword}
-                            onChange={handleChange}
-                            className="py-3 px-4 block w-full shadow-sm focus:ring-purple-500 focus:border-purple-500 border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Confirm New Password
-                        </label>
-                        <div className="mt-1">
-                          <input
-                            type="password"
-                            name="confirmPassword"
-                            id="confirmPassword"
-                            value={formData.confirmPassword}
-                            onChange={handleChange}
-                            className="py-3 px-4 block w-full shadow-sm focus:ring-purple-500 focus:border-purple-500 border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end space-x-4 mt-8">
-                    <motion.div
-                      variants={buttonVariants}
-                      whileHover="hover"
-                      whileTap="tap"
-                    >
-                      <motion.button
-                        type="button"
-                        onClick={() => setIsEditing(false)}
-                        className="py-3 px-6 border border-gray-200 dark:border-gray-600 rounded-xl shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center"
-                      >
-                        <svg className="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <div className="absolute top-4 right-4">
+                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        Cancel
-                      </motion.button>
-                    </motion.div>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Share a brief description about yourself</p>
+                  </div>
 
-                    <motion.div
-                      className="relative overflow-hidden rounded-xl"
-                      variants={buttonVariants}
-                      whileHover="hover"
-                      whileTap="tap"
+
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-4 pt-8">
+                    <motion.button
+                      type="button"
+                      onClick={() => setIsEditing(false)}
+                      className="flex-1 sm:flex-none px-8 py-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-300 border border-gray-300 dark:border-gray-600 flex items-center justify-center space-x-2"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      disabled={isSubmitting}
                     >
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-indigo-500 opacity-80 blur-lg transform scale-110"></div>
-                      <motion.button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="relative py-3 px-6 border border-transparent rounded-xl shadow-md text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 flex items-center"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <svg className="animate-spin mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Saving Changes...
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            Save Changes
-                          </>
-                        )}
-                      </motion.button>
-                    </motion.div>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      <span>Cancel</span>
+                    </motion.button>
+
+                    <motion.button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex-1 px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl font-semibold hover:from-green-700 hover:to-emerald-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98] shadow-lg flex items-center justify-center space-x-2"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <svg className="animate-spin w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          <span>Saving Changes...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span>Save Changes</span>
+                        </>
+                      )}
+                    </motion.button>
                   </div>
                 </div>
               </form>
+              </div>
             ) : (
               <div className="space-y-8">
                 {/* Account Information Section */}
                 <motion.div
                   variants={itemVariants}
-                  className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-6 hover:shadow-lg transition-shadow duration-300"
+                  className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/20 shadow-xl p-8 hover:shadow-2xl transition-all duration-300"
                 >
-                  <div className="flex items-center mb-4">
-                    <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg mr-3">
-                      <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <div className="flex items-center space-x-4 mb-6">
+                    <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Account Information</h3>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">Account Information</h3>
+                      <p className="text-gray-600 dark:text-gray-300">Your personal details and contact information</p>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <motion.div
-                      className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-700"
-                      whileHover={{ y: -2 }}
+                      className="p-6 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-800/30 shadow-lg"
+                      whileHover={{ y: -4, scale: 1.02 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                     >
-                      <div className="flex items-center mb-2">
-                        <svg className="w-4 h-4 text-gray-500 dark:text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Display Name</dt>
+                      <div className="flex items-center mb-3">
+                        <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        </div>
+                        <dt className="text-sm font-semibold text-blue-800 dark:text-blue-300">Display Name</dt>
                       </div>
-                      <dd className="text-base font-medium text-gray-900 dark:text-white">{user.displayName || 'Not set'}</dd>
+                      <dd className="text-lg font-bold text-blue-900 dark:text-blue-100">{user.displayName || 'Not set'}</dd>
                     </motion.div>
 
                     <motion.div
-                      className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-700"
-                      whileHover={{ y: -2 }}
+                      className="p-6 rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border border-purple-200 dark:border-purple-800/30 shadow-lg"
+                      whileHover={{ y: -4, scale: 1.02 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                     >
-                      <div className="flex items-center mb-2">
-                        <svg className="w-4 h-4 text-gray-500 dark:text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</dt>
+                      <div className="flex items-center mb-3">
+                        <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <dt className="text-sm font-semibold text-purple-800 dark:text-purple-300">Email Address</dt>
                       </div>
-                      <dd className="text-base font-medium text-gray-900 dark:text-white">{user.email}</dd>
+                      <dd className="text-lg font-bold text-purple-900 dark:text-purple-100">{user.email}</dd>
                     </motion.div>
 
                     <motion.div
-                      className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-700 md:col-span-2"
-                      whileHover={{ y: -2 }}
+                      className="p-6 rounded-2xl bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border border-green-200 dark:border-green-800/30 shadow-lg md:col-span-2"
+                      whileHover={{ y: -4, scale: 1.01 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                     >
-                      <div className="flex items-center mb-2">
-                        <svg className="w-4 h-4 text-gray-500 dark:text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Bio</dt>
+                      <div className="flex items-center mb-3">
+                        <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center mr-3">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                        </div>
+                        <dt className="text-sm font-semibold text-green-800 dark:text-green-300">Bio</dt>
                       </div>
-                      <dd className="text-base text-gray-900 dark:text-white">{user.bio || 'No bio provided'}</dd>
+                      <dd className="text-base text-green-900 dark:text-green-100">{user.bio || 'No bio provided yet. Click "Edit Profile" to add one!'}</dd>
                     </motion.div>
                   </div>
                 </motion.div>
@@ -876,7 +868,7 @@ const UserProfile = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Account Statistics</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Account Statistics</h3>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -888,7 +880,13 @@ const UserProfile = () => {
                       <div className="absolute -right-6 -top-6 w-20 h-20 bg-purple-200 dark:bg-purple-700/20 rounded-full opacity-50"></div>
                       <dt className="text-sm font-medium text-purple-800 dark:text-purple-300 mb-2 relative z-10">Images Generated</dt>
                       <dd className="text-3xl font-bold text-purple-600 dark:text-purple-400 relative z-10">
-                        {user.imagesGenerated || 0}
+                        {isLoadingStats ? (
+                          <div className="animate-pulse bg-purple-200 dark:bg-purple-700 h-8 w-12 rounded"></div>
+                        ) : statsError ? (
+                          <span className="text-red-500">--</span>
+                        ) : (
+                          statistics.imagesGenerated
+                        )}
                       </dd>
                       <div className="mt-2 flex items-center text-xs text-purple-600 dark:text-purple-300 opacity-70">
                         <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -906,7 +904,13 @@ const UserProfile = () => {
                       <div className="absolute -right-6 -top-6 w-20 h-20 bg-blue-200 dark:bg-blue-700/20 rounded-full opacity-50"></div>
                       <dt className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2 relative z-10">Images Edited</dt>
                       <dd className="text-3xl font-bold text-blue-600 dark:text-blue-400 relative z-10">
-                        {user.imagesEdited || 0}
+                        {isLoadingStats ? (
+                          <div className="animate-pulse bg-blue-200 dark:bg-blue-700 h-8 w-12 rounded"></div>
+                        ) : statsError ? (
+                          <span className="text-red-500">--</span>
+                        ) : (
+                          statistics.imagesEdited
+                        )}
                       </dd>
                       <div className="mt-2 flex items-center text-xs text-blue-600 dark:text-blue-300 opacity-70">
                         <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -938,26 +942,22 @@ const UserProfile = () => {
                   </div>
                 </motion.div>
 
-                <div className="flex justify-end mt-8">
-                  <motion.div
-                    className="relative overflow-hidden rounded-xl"
-                    variants={buttonVariants}
-                    whileHover="hover"
-                    whileTap="tap"
+                <div className="flex justify-center mt-10">
+                  <motion.button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-2xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg flex items-center space-x-3 transform hover:scale-105"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-indigo-500 opacity-80 blur-lg transform scale-110"></div>
-                    <motion.button
-                      type="button"
-                      onClick={() => setIsEditing(true)}
-                      className="relative py-3 px-6 border border-transparent rounded-xl shadow-md text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center"
-                    >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                      </svg>
-                      Edit Profile
-                      <span className="ml-1 text-xs opacity-80">(to change photo & details)</span>
-                    </motion.button>
-                  </motion.div>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                    <span>Edit Profile</span>
+                    <div className="text-xs bg-white/20 px-2 py-1 rounded-full">
+                      Update Info
+                    </div>
+                  </motion.button>
                 </div>
               </div>
             )}

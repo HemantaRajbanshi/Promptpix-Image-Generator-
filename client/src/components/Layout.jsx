@@ -1,21 +1,23 @@
-import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
-import Footer from './Footer';
+import Footer from './md3/Footer';
+
 
 const Layout = ({ children }) => {
   const location = useLocation();
 
-  // Don't show footer on dashboard pages
-  const isDashboardPage = location.pathname.includes('/dashboard');
+  // Define routes where footer should be shown (only public marketing pages)
+  const publicMarketingPages = ['/', '/about', '/contact'];
+  const shouldShowFooter = publicMarketingPages.includes(location.pathname);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen flex flex-col bg-surface">
       <Navbar />
-      <main className={`flex-grow ${isDashboardPage ? 'pb-0' : 'pb-4'}`}>
+      <main className="flex-grow">
         {children}
       </main>
-      {!isDashboardPage && <Footer />}
+      {shouldShowFooter && <Footer />}
+
     </div>
   );
 };

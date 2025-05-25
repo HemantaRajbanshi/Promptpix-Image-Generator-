@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 
 const CreditsDisplay = () => {
-  const { user, addCredits } = useAuth();
+  const { user, addCredits, creditsLoading, refreshCredits } = useAuth();
   const [isHovering, setIsHovering] = useState(false);
   const creditRef = useRef(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -61,12 +61,29 @@ const CreditsDisplay = () => {
         className="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border border-purple-100 dark:border-purple-800/30 cursor-pointer shadow-sm hover:shadow-md transition-shadow duration-300"
       >
         <motion.div
-          className={`w-3 h-3 rounded-full ${getStatusColor()}`}
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          className={`w-3 h-3 rounded-full ${creditsLoading ? 'bg-blue-500' : getStatusColor()}`}
+          animate={creditsLoading ?
+            { scale: [1, 1.3, 1], rotate: [0, 180, 360] } :
+            { scale: [1, 1.2, 1] }
+          }
+          transition={creditsLoading ?
+            { duration: 1, repeat: Infinity, ease: "easeInOut" } :
+            { duration: 2, repeat: Infinity, ease: "easeInOut" }
+          }
         />
         <div className="text-sm font-medium bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent flex items-center">
-          <span className="mr-1">{credits}</span>
+          <span className="mr-1">
+            {creditsLoading ? (
+              <motion.span
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 1, repeat: Infinity }}
+              >
+                ...
+              </motion.span>
+            ) : (
+              credits
+            )}
+          </span>
           <motion.span
             initial={{ opacity: 0.8 }}
             animate={{ opacity: [0.8, 1, 0.8] }}
@@ -109,7 +126,16 @@ const CreditsDisplay = () => {
                     </h3>
 
                     <span className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                      {credits}
+                      {creditsLoading ? (
+                        <motion.span
+                          animate={{ opacity: [0.5, 1, 0.5] }}
+                          transition={{ duration: 1, repeat: Infinity }}
+                        >
+                          ...
+                        </motion.span>
+                      ) : (
+                        credits
+                      )}
                     </span>
                   </div>
 
@@ -166,7 +192,16 @@ const CreditsDisplay = () => {
                     </h3>
 
                     <span className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                      {credits}
+                      {creditsLoading ? (
+                        <motion.span
+                          animate={{ opacity: [0.5, 1, 0.5] }}
+                          transition={{ duration: 1, repeat: Infinity }}
+                        >
+                          ...
+                        </motion.span>
+                      ) : (
+                        credits
+                      )}
                     </span>
                   </div>
 

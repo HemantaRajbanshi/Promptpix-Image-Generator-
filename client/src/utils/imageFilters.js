@@ -139,22 +139,28 @@ export const adjustSaturation = (canvas, value) => {
  * @param {string} filter - The filter to apply ('grayscale', 'sepia', etc.)
  */
 export const applyFilter = (canvas, filter) => {
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const ctx = canvas.getContext('2d', {
+    willReadFrequently: true,
+    alpha: false // Optimize for opaque images
+  });
+
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
+  const length = data.length;
 
   switch (filter) {
     case 'grayscale':
-      for (let i = 0; i < data.length; i += 4) {
-        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-        data[i] = avg;     // Red
-        data[i + 1] = avg; // Green
-        data[i + 2] = avg; // Blue
+      for (let i = 0; i < length; i += 4) {
+        // Use luminance formula for better grayscale conversion
+        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        data[i] = gray;     // Red
+        data[i + 1] = gray; // Green
+        data[i + 2] = gray; // Blue
       }
       break;
 
     case 'sepia':
-      for (let i = 0; i < data.length; i += 4) {
+      for (let i = 0; i < length; i += 4) {
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
@@ -166,7 +172,7 @@ export const applyFilter = (canvas, filter) => {
       break;
 
     case 'invert':
-      for (let i = 0; i < data.length; i += 4) {
+      for (let i = 0; i < length; i += 4) {
         data[i] = 255 - data[i];         // Red
         data[i + 1] = 255 - data[i + 1]; // Green
         data[i + 2] = 255 - data[i + 2]; // Blue
@@ -174,7 +180,7 @@ export const applyFilter = (canvas, filter) => {
       break;
 
     case 'vintage':
-      for (let i = 0; i < data.length; i += 4) {
+      for (let i = 0; i < length; i += 4) {
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
@@ -186,14 +192,15 @@ export const applyFilter = (canvas, filter) => {
       break;
 
     case 'cool':
-      for (let i = 0; i < data.length; i += 4) {
+      for (let i = 0; i < length; i += 4) {
         data[i + 2] = Math.min(255, data[i + 2] + 20); // Add blue
       }
       break;
 
     case 'warm':
-      for (let i = 0; i < data.length; i += 4) {
+      for (let i = 0; i < length; i += 4) {
         data[i] = Math.min(255, data[i] + 20); // Add red
+        data[i + 1] = Math.min(255, data[i + 1] + 10); // Add green
       }
       break;
 

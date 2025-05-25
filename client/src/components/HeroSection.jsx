@@ -1,11 +1,12 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 const HeroSection = () => {
   // Get authentication state
   const { isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
   const [prompt, setPrompt] = useState('');
   const inputRef = useRef(null);
 
@@ -34,8 +35,8 @@ const HeroSection = () => {
 
   const handleGenerateClick = () => {
     if (prompt.trim()) {
-      // Redirect to text-to-image page with the prompt
-      window.location.href = `/dashboard/text-to-image?prompt=${encodeURIComponent(prompt)}`;
+      // Navigate to text-to-image page with the prompt
+      navigate(`/dashboard/text-to-image?prompt=${encodeURIComponent(prompt)}`);
     } else {
       // Focus on the input if empty
       inputRef.current?.focus();
