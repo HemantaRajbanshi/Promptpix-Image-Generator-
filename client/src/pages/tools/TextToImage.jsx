@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import CreditCheck from '../../components/CreditCheck';
 import PortraitPromptAssistant from '../../components/PortraitPromptAssistant';
 import { useLocation } from 'react-router-dom';
+import DashboardContentWrapper from '../../components/DashboardContentWrapper';
 
 const TextToImage = () => {
   const { useCredits, refreshCredits, user } = useAuth();
@@ -123,12 +124,13 @@ const TextToImage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 md:p-6">
+    <DashboardContentWrapper>
       <div className="max-w-7xl mx-auto">
         {/* Modern Header */}
         <motion.div
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="mb-10"
         >
           <div className="flex items-center space-x-4 mb-4">
@@ -161,7 +163,8 @@ const TextToImage = () => {
             <motion.div
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 shadow-2xl overflow-hidden"
+              transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94], delay: 0.1 }}
+              className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 shadow-lg overflow-hidden"
             >
               <div className="p-8 md:p-10">
                 <div className="flex items-center space-x-4 mb-8">
@@ -257,7 +260,8 @@ const TextToImage = () => {
             <motion.div
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
-              className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 shadow-2xl overflow-hidden"
+              transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94], delay: 0.2 }}
+              className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 shadow-lg overflow-hidden"
             >
               {result ? (
                 <div className="p-8 md:p-10">
@@ -368,7 +372,7 @@ const TextToImage = () => {
           </motion.div>
         )}
       </div>
-    </div>
+    </DashboardContentWrapper>
   );
 };
 

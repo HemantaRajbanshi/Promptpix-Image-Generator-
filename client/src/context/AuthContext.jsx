@@ -288,6 +288,47 @@ export const AuthProvider = ({ children }) => {
     } finally {
       // Clear user data regardless of API response
       setUser(null);
+      // Clear all authentication tokens and session data
+      localStorage.removeItem('token');
+      localStorage.removeItem('promptpix_current_user');
+      // Clear any other user-specific data
+      sessionStorage.clear();
+    }
+  };
+
+  // Complete logout with full cleanup (for account deletion)
+  const completeLogout = async () => {
+    setError(null);
+    try {
+      await authAPI.logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      // Clear user data
+      setUser(null);
+
+      // Clear all localStorage data
+      localStorage.clear();
+
+      // Clear all sessionStorage data
+      sessionStorage.clear();
+
+      // Clear any pending timers
+      if (updateTimerRef.current) {
+        clearTimeout(updateTimerRef.current);
+        updateTimerRef.current = null;
+      }
+
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+
+      // Reset internal state
+      lastUpdateTimeRef.current = 0;
+      setCreditsLoading(false);
+      setLoading(false);
+      setError(null);
     }
   };
 
@@ -548,6 +589,7 @@ export const AuthProvider = ({ children }) => {
     login,
     signup,
     logout,
+    completeLogout, // For account deletion with full cleanup
     updateUser,
     addCredits,
     useCredits,

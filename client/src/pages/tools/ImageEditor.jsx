@@ -1,20 +1,28 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ImageEditor from '../../components/ImageEditor';
 import { downloadImage } from '../../utils/download';
-import { addGalleryItem } from '../../services/local-storage/gallery';
-import { useAuth } from '../../context/AuthContext';
+import DashboardContentWrapper from '../../components/DashboardContentWrapper';
 
 const ImageEditorTool = () => {
-  const { user } = useAuth();
   const [uploadedImage, setUploadedImage] = useState(null);
   const [editedImage, setEditedImage] = useState(null);
+  const [editedImageUrl, setEditedImageUrl] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
   const fileInputRef = useRef(null);
+
+  // Cleanup blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (editedImageUrl) {
+        URL.revokeObjectURL(editedImageUrl);
+      }
+    };
+  }, [editedImageUrl]);
 
   // Handle file selection
   const handleFileChange = (e) => {
@@ -30,6 +38,11 @@ const ImageEditorTool = () => {
     setErrorMessage('');
     setSuccessMessage('');
 
+    // Clean up previous blob URL
+    if (editedImageUrl) {
+      URL.revokeObjectURL(editedImageUrl);
+    }
+
     // Check if file is an image
     if (!file.type.match('image.*')) {
       setErrorMessage('Please select an image file (JPEG, PNG, etc.)');
@@ -44,8 +57,11 @@ const ImageEditorTool = () => {
 
     // Create blob URL for the image
     const imageBlob = new Blob([file], { type: file.type });
+    const imageUrl = URL.createObjectURL(imageBlob);
+
     setUploadedImage(imageBlob);
     setEditedImage(imageBlob); // Initially, edited image is the same as uploaded
+    setEditedImageUrl(imageUrl);
     setIsEditing(false); // Don't start editing automatically
 
     setSuccessMessage('Image uploaded successfully! Click "Edit Image" to start editing.');
@@ -80,29 +96,8 @@ const ImageEditorTool = () => {
     fileInputRef.current.click();
   };
 
-  // Handle save from editor
-  const handleSaveEdit = (editedBlob) => {
-    setEditedImage(editedBlob);
-    setSuccessMessage('Image edited successfully!');
-
-    // Save to gallery with user ID
-    const imageUrl = URL.createObjectURL(editedBlob);
-    addGalleryItem({
-      imageUrl: imageUrl,
-      prompt: 'Edited image',
-      type: 'image-editor',
-      userId: user?.id || user?._id, // Associate with current user
-      blob: editedBlob
-    });
-
-    // Dispatch custom event to notify other components
-    window.dispatchEvent(new CustomEvent('galleryUpdated'));
-
-    // Clear success message after 3 seconds
-    setTimeout(() => {
-      setSuccessMessage('');
-    }, 3000);
-  };
+  // Note: Save handling is now done entirely in the modal ImageEditor component
+  // This prevents double saving and error conflicts
 
   // Handle download
   const handleDownload = () => {
@@ -120,8 +115,14 @@ const ImageEditorTool = () => {
 
   // Reset everything
   const handleReset = () => {
+    // Clean up blob URL
+    if (editedImageUrl) {
+      URL.revokeObjectURL(editedImageUrl);
+    }
+
     setUploadedImage(null);
     setEditedImage(null);
+    setEditedImageUrl(null);
     setIsEditing(false);
     setErrorMessage('');
     setSuccessMessage('');
@@ -133,12 +134,13 @@ const ImageEditorTool = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 md:p-6">
+    <DashboardContentWrapper>
       <div className="max-w-7xl mx-auto">
         {/* Modern Header */}
         <motion.div
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="mb-10"
         >
           <div className="flex items-center space-x-4 mb-4">
@@ -208,6 +210,7 @@ const ImageEditorTool = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94], delay: 0.1 }}
             className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 shadow-2xl overflow-hidden"
           >
             <div className="p-8 md:p-10">
@@ -307,6 +310,7 @@ const ImageEditorTool = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94], delay: 0.1 }}
             className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 shadow-2xl overflow-hidden"
           >
             {!isEditing ? (
@@ -329,7 +333,7 @@ const ImageEditorTool = () => {
                   <div className="relative group">
                     <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-2xl overflow-hidden shadow-inner">
                       <img
-                        src={URL.createObjectURL(editedImage)}
+                        src={editedImageUrl}
                         alt="Uploaded"
                         className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
                       />
@@ -383,14 +387,13 @@ const ImageEditorTool = () => {
       </div>
 
       {/* Full-screen Image Editor Overlay */}
-      {isEditing && (
+      {isEditing && editedImageUrl && (
         <ImageEditor
-          imageUrl={URL.createObjectURL(editedImage)}
-          onSave={handleSaveEdit}
+          imageUrl={editedImageUrl}
           onClose={() => setIsEditing(false)}
         />
       )}
-    </div>
+    </DashboardContentWrapper>
   );
 };
 

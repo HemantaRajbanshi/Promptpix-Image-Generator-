@@ -1,11 +1,12 @@
 const axios = require('axios');
 const FormData = require('form-data');
+const { deductCredits } = require('../middleware/creditMiddleware');
 
 // Base URL for ClipDrop API
 const BASE_URL = process.env.CLIPDROP_API_URL || 'https://clipdrop-api.co';
 
 // Helper function to handle file uploads and API calls
-const makeClipDropRequest = async (endpoint, formData, res) => {
+const makeClipDropRequest = async (endpoint, formData, req, res) => {
   // Check if we're in development mode and should use mock responses
   const useMockResponse = process.env.NODE_ENV !== 'production' &&
     (!process.env.CLIPDROP_API_KEY || process.env.USE_MOCK_IMAGES === 'true');
@@ -117,6 +118,14 @@ const makeClipDropRequest = async (endpoint, formData, res) => {
     // Set response headers
     res.set('Content-Type', response.headers['content-type']);
 
+    // Deduct credits after successful operation
+    await new Promise((resolve, reject) => {
+      deductCredits(req, res, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
     // Send the response
     res.send(response.data);
   } catch (error) {
@@ -186,7 +195,7 @@ exports.textToImage = async (req, res) => {
     // Note: ClipDrop API generates images at a fixed 1024x1024 resolution
     // Width and height parameters are not supported
 
-    await makeClipDropRequest('/text-to-image/v1', formData, res);
+    await makeClipDropRequest('/text-to-image/v1', formData, req, res);
   } catch (error) {
     res.status(500).json({
       status: 'error',
@@ -217,7 +226,7 @@ exports.upscaleImage = async (req, res) => {
       formData.append('target_height', req.body.target_height);
     }
 
-    await makeClipDropRequest('/image-upscaling/v1/upscale', formData, res);
+    await makeClipDropRequest('/image-upscaling/v1/upscale', formData, req, res);
   } catch (error) {
     res.status(500).json({
       status: 'error',
@@ -249,7 +258,7 @@ exports.uncropImage = async (req, res) => {
     formData.append('extend_up', req.body.extend_up || extendPixels);
     formData.append('extend_down', req.body.extend_down || extendPixels);
 
-    await makeClipDropRequest('/uncrop/v1', formData, res);
+    await makeClipDropRequest('/uncrop/v1', formData, req, res);
   } catch (error) {
     res.status(500).json({
       status: 'error',
@@ -274,7 +283,7 @@ exports.removeBackground = async (req, res) => {
       contentType: req.file.mimetype
     });
 
-    await makeClipDropRequest('/remove-background/v1', formData, res);
+    await makeClipDropRequest('/remove-background/v1', formData, req, res);
   } catch (error) {
     res.status(500).json({
       status: 'error',

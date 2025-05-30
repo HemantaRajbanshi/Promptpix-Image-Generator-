@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const { createCompleteUser } = require('../utils/userUtils');
+const { addCreditsToUser, getCreditHistory } = require('../middleware/creditMiddleware');
 
 // Throttling map to limit update frequency
 // Key: userId, Value: timestamp of last update
@@ -127,7 +128,7 @@ exports.updateMe = async (req, res) => {
 // Add credits to user
 exports.addCredits = async (req, res) => {
   try {
-    const { amount } = req.body;
+    const { amount, description } = req.body;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({
@@ -136,15 +137,24 @@ exports.addCredits = async (req, res) => {
       });
     }
 
-    // Find user and update credits
-    const user = await User.findById(req.user.id);
-    user.credits += amount;
-    await user.save();
+    // Use the credit middleware function for consistency
+    const updatedUser = await addCreditsToUser(
+      req.user.id,
+      amount,
+      description || `Added ${amount} credits`
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'User not found'
+      });
+    }
 
     res.status(200).json({
       status: 'success',
       data: {
-        user
+        user: updatedUser
       }
     });
   } catch (error) {
@@ -196,4 +206,23 @@ exports.useCredits = async (req, res) => {
   }
 };
 
+// Get user's credit history
+exports.getCreditHistory = async (req, res) => {
+  try {
+    const { limit } = req.query;
+    const history = await getCreditHistory(req.user.id, limit ? parseInt(limit) : 50);
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        history
+      }
+    });
+  } catch (error) {
+    res.status(400).json({
+      status: 'fail',
+      message: error.message
+    });
+  }
+};
 

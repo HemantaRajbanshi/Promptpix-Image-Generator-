@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUserGalleryItems, removeGalleryItem } from '../services/local-storage/gallery';
+import { getUserGalleryItems, removeGalleryItem, updateGalleryItemInteraction, searchGalleryItems } from '../services/local-storage/gallery';
 import { downloadImage } from '../utils/download';
 import { useAuth } from '../context/AuthContext';
+import { UI_CONFIG } from '../constants';
 
 const MasonryGallery = () => {
   const { user } = useAuth();
@@ -13,6 +14,9 @@ const MasonryGallery = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const searchTimeoutRef = useRef(null);
 
   // Load gallery items when user changes
   useEffect(() => {
@@ -49,6 +53,31 @@ const MasonryGallery = () => {
       }
     };
   }, [user]);
+
+  // Debounced search effect
+  useEffect(() => {
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Set new timeout for debounced search
+    searchTimeoutRef.current = setTimeout(() => {
+      if (searchTerm.trim()) {
+        const results = searchGalleryItems(galleryItems, searchTerm);
+        setSearchResults(results);
+      } else {
+        setSearchResults([]);
+      }
+    }, UI_CONFIG.DEBOUNCE_DELAY);
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm, galleryItems]);
 
   // Load user-specific gallery items from local storage
   const loadGalleryItems = () => {
@@ -89,6 +118,32 @@ const MasonryGallery = () => {
     }
   };
 
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  // Handle clear search
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setSearchResults([]);
+  };
+
+  // Handle image click to track interactions
+  const handleImageClick = (item) => {
+    try {
+      // Update interaction data for smart sorting
+      updateGalleryItemInteraction(item.id);
+
+      // Set selected item to open modal
+      setSelectedItem(item);
+    } catch (error) {
+      console.error('Error tracking image interaction:', error);
+      // Still open the modal even if tracking fails
+      setSelectedItem(item);
+    }
+  };
+
   // Handle image download
   const handleDownload = async (item) => {
     try {
@@ -117,20 +172,61 @@ const MasonryGallery = () => {
     }
   };
 
+  // Calculate smart sort score for an item
+  const calculateSmartScore = (item) => {
+    try {
+      const now = Date.now();
+      const createdAt = new Date(item.createdAt).getTime();
+      const lastViewed = new Date(item.lastViewed || item.createdAt).getTime();
+      const viewCount = item.viewCount || 0;
+
+      // Validate timestamps
+      if (isNaN(createdAt) || isNaN(lastViewed)) {
+        console.warn('Invalid timestamp found in item:', item.id);
+        return Number.MAX_SAFE_INTEGER; // Push invalid items to the end
+      }
+
+      // Weighted score calculation (lower score = higher priority)
+      // Time since creation (40% weight)
+      const timeSinceCreation = (now - createdAt) * 0.4;
+      // Time since last viewed (30% weight)
+      const timeSinceViewed = (now - lastViewed) * 0.3;
+      // View count bonus (30% weight, inverted so more views = lower score)
+      const viewCountBonus = (viewCount * 100 * 0.3);
+
+      return timeSinceCreation + timeSinceViewed - viewCountBonus;
+    } catch (error) {
+      console.error('Error calculating smart score for item:', item.id, error);
+      return Number.MAX_SAFE_INTEGER; // Push errored items to the end
+    }
+  };
+
   // Filter and sort items
   const filteredAndSortedItems = () => {
-    // First, filter items
-    let filtered = galleryItems;
+    // Start with search results if search is active, otherwise use all gallery items
+    let items = searchTerm.trim() ? searchResults : galleryItems;
+
+    // Apply type filter
     if (filter !== 'all') {
-      filtered = galleryItems.filter(item => item.type === filter);
+      items = items.filter(item => item.type === filter);
     }
 
-    // Then, sort items
-    return filtered.sort((a, b) => {
+    // If search is active, items are already sorted by search score
+    if (searchTerm.trim()) {
+      return items;
+    }
+
+    // Otherwise, apply regular sorting
+    return items.sort((a, b) => {
       if (sortBy === 'newest') {
         return new Date(b.createdAt) - new Date(a.createdAt);
       } else if (sortBy === 'oldest') {
         return new Date(a.createdAt) - new Date(b.createdAt);
+      } else if (sortBy === 'smart') {
+        // Smart sort using weighted recency-frequency algorithm
+        const scoreA = calculateSmartScore(a);
+        const scoreB = calculateSmartScore(b);
+        return scoreA - scoreB; // Lower score = higher priority
       }
       return 0;
     });
@@ -169,6 +265,37 @@ const MasonryGallery = () => {
       {/* Filter and Sort Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5 mb-6">
         <div className="flex flex-wrap gap-4 justify-between items-center">
+          {/* Search Input */}
+          <div className="flex items-center flex-1 min-w-0 max-w-md">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-3">Search:</span>
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                placeholder="Search by prompt or type..."
+                className="w-full pl-10 pr-10 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              {searchTerm && (
+                <button
+                  onClick={handleClearSearch}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                  title="Clear search"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter Dropdown */}
           <div className="flex items-center">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-3">Filter:</span>
             <div className="relative">
@@ -192,6 +319,7 @@ const MasonryGallery = () => {
             </div>
           </div>
 
+          {/* Sort Dropdown */}
           <div className="flex items-center">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-3">Sort:</span>
             <div className="relative">
@@ -199,9 +327,11 @@ const MasonryGallery = () => {
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 className="appearance-none pl-4 pr-10 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                disabled={searchTerm.trim() !== ''}
               >
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
+                <option value="smart">Smart Sort: Personalized</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -254,9 +384,13 @@ const MasonryGallery = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Your Gallery is Empty</h3>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            {searchTerm.trim() ? 'No Images Match Your Search' : 'Your Gallery is Empty'}
+          </h3>
           <p className="mt-3 text-gray-600 dark:text-gray-300 max-w-md mx-auto">
-            {filter === 'all'
+            {searchTerm.trim()
+              ? `No images found matching "${searchTerm}". Try different keywords or check your spelling.`
+              : filter === 'all'
               ? "You haven't created any images yet. Start by generating some amazing visuals!"
               : `You don't have any ${getTypeDisplayName(filter).toLowerCase()} images in your gallery.`}
           </p>
@@ -278,7 +412,7 @@ const MasonryGallery = () => {
             <div
               key={item.id}
               className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100 dark:border-gray-700 transform hover:-translate-y-1 mb-6 break-inside-avoid"
-              onClick={() => setSelectedItem(item)}
+              onClick={() => handleImageClick(item)}
             >
               <div
                 className="relative"
@@ -331,16 +465,19 @@ const MasonryGallery = () => {
                             const originalOnLoad = img.onload;
 
                             img.onload = function() {
-                              // Clean up the blob URL after successful load
-                              URL.revokeObjectURL(newUrl);
+                              // DON'T revoke the blob URL immediately - let it persist for gallery display
+                              // Schedule cleanup after a longer delay to prevent access errors
+                              setTimeout(() => {
+                                URL.revokeObjectURL(newUrl);
 
-                              // Remove from tracking array
-                              if (window._blobUrlsToRevoke) {
-                                const index = window._blobUrlsToRevoke.indexOf(newUrl);
-                                if (index !== -1) {
-                                  window._blobUrlsToRevoke.splice(index, 1);
+                                // Remove from tracking array
+                                if (window._blobUrlsToRevoke) {
+                                  const index = window._blobUrlsToRevoke.indexOf(newUrl);
+                                  if (index !== -1) {
+                                    window._blobUrlsToRevoke.splice(index, 1);
+                                  }
                                 }
-                              }
+                              }, 15000); // 15 second delay to prevent premature revocation
 
                               // Call original onload if it exists
                               if (originalOnLoad) {
@@ -513,16 +650,19 @@ const MasonryGallery = () => {
                           const originalOnLoad = img.onload;
 
                           img.onload = function() {
-                            // Clean up the blob URL after successful load
-                            URL.revokeObjectURL(newUrl);
+                            // DON'T revoke the blob URL immediately - let it persist for modal display
+                            // Schedule cleanup after a longer delay to prevent access errors
+                            setTimeout(() => {
+                              URL.revokeObjectURL(newUrl);
 
-                            // Remove from tracking array
-                            if (window._blobUrlsToRevoke) {
-                              const index = window._blobUrlsToRevoke.indexOf(newUrl);
-                              if (index !== -1) {
-                                window._blobUrlsToRevoke.splice(index, 1);
+                              // Remove from tracking array
+                              if (window._blobUrlsToRevoke) {
+                                const index = window._blobUrlsToRevoke.indexOf(newUrl);
+                                if (index !== -1) {
+                                  window._blobUrlsToRevoke.splice(index, 1);
+                                }
                               }
-                            }
+                            }, 15000); // 15 second delay to prevent premature revocation
 
                             // Call original onload if it exists
                             if (originalOnLoad) {

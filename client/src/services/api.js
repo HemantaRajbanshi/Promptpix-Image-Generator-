@@ -47,11 +47,19 @@ const apiRequest = async (endpoint, options = {}) => {
     try {
       data = await response.json();
     } catch (jsonError) {
+      // Handle non-JSON responses (like HTML error pages)
+      if (response.status === 429) {
+        throw new Error('Too many requests. Please try again later.');
+      }
       throw new Error('Invalid response format');
     }
 
     // Check if response is ok
     if (!response.ok) {
+      // Handle rate limiting specifically
+      if (response.status === 429) {
+        throw new Error(data.message || 'Too many requests. Please try again later.');
+      }
       throw new Error(data.message || 'Something went wrong');
     }
 
@@ -102,6 +110,7 @@ export const authAPI = {
 
     // Remove token from localStorage
     localStorage.removeItem('token');
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
 
     return data;
   },
@@ -142,7 +151,7 @@ export const authAPI = {
 
   // Delete account
   deleteAccount: async (password) => {
-    return apiRequest('/auth/delete-account', {
+    const data = await apiRequest('/auth/delete-account', {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -151,6 +160,13 @@ export const authAPI = {
         password
       }),
     });
+
+    // Clear all authentication tokens immediately after successful deletion
+    localStorage.removeItem('token');
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+
+    return data;
   },
 };
 
@@ -183,6 +199,11 @@ export const userAPI = {
       method: 'POST',
       body: JSON.stringify({ amount }),
     });
+  },
+
+  // Get credit history
+  getCreditHistory: async (limit = 50) => {
+    return apiRequest(`/users/credit-history?limit=${limit}`);
   },
 };
 

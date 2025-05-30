@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import DashboardContentWrapper from '../components/DashboardContentWrapper';
 
 const Pricing = () => {
   const { user, addCredits } = useAuth();
@@ -19,9 +20,9 @@ const Pricing = () => {
       price: 0,
       features: [
         'One-time 10 free credits',
-        'Basic image generation',
-        'Free image editing',
-        'Standard resolution'
+        '5 AI image generations',
+        'Free image editing (unlimited)',
+        'Standard resolution (1024×1024)'
       ],
       recommended: false,
       color: 'green'
@@ -32,9 +33,9 @@ const Pricing = () => {
       credits: 100,
       price: 15,
       features: [
-        'Generate 100 images',
-        'All editing tools',
-        'High resolution',
+        '50 AI image generations',
+        'All editing tools (unlimited)',
+        'High resolution (1024×1024)',
         'Priority processing'
       ],
       recommended: true,
@@ -46,9 +47,9 @@ const Pricing = () => {
       credits: 500,
       price: 50,
       features: [
-        'Generate 500 images',
-        'All editing tools',
-        'Maximum resolution',
+        '250 AI image generations',
+        'All editing tools (unlimited)',
+        'Maximum resolution (1024×1024)',
         'Priority processing',
         'Dedicated support'
       ],
@@ -114,29 +115,43 @@ const Pricing = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <motion.div
-        className="max-w-5xl mx-auto"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
+    <DashboardContentWrapper>
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
         <motion.div
-          className="text-center mb-12"
-          variants={itemVariants}
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="text-center mb-16"
         >
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent mb-6">
             Choose Your Plan
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Choose the plan that works best for you and start creating amazing AI-generated images today.
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+            Get more credits to unlock unlimited creativity with our AI-powered tools
           </p>
-          {user && (
-            <p className="mt-4 text-purple-600 dark:text-purple-400 font-medium">
-              Current balance: {user.credits || 0} credits
-            </p>
-          )}
         </motion.div>
+
+        {/* User Credits Info */}
+        {user && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94], delay: 0.1 }}
+            className="text-center mb-12"
+          >
+            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-violet-500/20 p-6">
+              <p className="text-purple-600 dark:text-purple-400 font-medium text-lg">
+                Current balance: {user.credits || 0} credits
+              </p>
+              {user.credits === 10 && (
+                <p className="mt-2 text-green-600 dark:text-green-400 text-sm">
+                  🎉 Welcome! You've received 10 free credits to get started.
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
 
         {successMessage ? (
           <motion.div
@@ -166,8 +181,10 @@ const Pricing = () => {
         ) : (
           <>
             <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94], delay: 0.2 }}
               className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12"
-              variants={itemVariants}
             >
               {plans.map((plan) => (
                 <motion.div
@@ -242,7 +259,7 @@ const Pricing = () => {
                   <>
                     <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                     Processing...
                   </>
@@ -274,7 +291,7 @@ const Pricing = () => {
                 How do credits work?
               </h3>
               <p className="text-gray-600 dark:text-gray-300">
-                Credits are used each time you generate or edit an image. Different operations require different amounts of credits.
+                Credits are consumed for AI-powered operations: Text-to-Image generation, Background removal, Image upscaling, and Uncrop tool. Each operation costs 2 credits. Image Editor tools (filters, adjustments, cropping) are completely free.
               </p>
             </div>
             <div>
@@ -295,8 +312,8 @@ const Pricing = () => {
             </div>
           </div>
         </motion.div>
-      </motion.div>
-    </div>
+      </div>
+    </DashboardContentWrapper>
   );
 };
 

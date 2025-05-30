@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import SkeletonLoader from '../components/SkeletonLoader';
+import DashboardContentWrapper from '../components/DashboardContentWrapper';
 import { useAuth } from '../context/AuthContext';
 import { getUserGalleryItems, getUserStatistics, addGalleryItem } from '../services/local-storage/gallery';
 import { debounce } from '../utils/debounce';
@@ -406,7 +408,7 @@ const UserProfile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 py-8 px-4 sm:px-6 lg:px-8">
+    <DashboardContentWrapper>
       <motion.div
         className="max-w-5xl mx-auto"
         variants={containerVariants}
@@ -964,7 +966,7 @@ const UserProfile = () => {
           </div>
         </motion.div>
       </motion.div>
-    </div>
+    </DashboardContentWrapper>
   );
 };
 

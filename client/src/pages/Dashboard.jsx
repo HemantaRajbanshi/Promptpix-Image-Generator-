@@ -1,6 +1,7 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import CreditsDisplay from '../components/CreditsDisplay';
+import CreditWarning from '../components/CreditWarning';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
 
@@ -188,6 +189,9 @@ const Dashboard = () => {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-surface-dim dark:bg-black">
+      {/* Credit Warning */}
+      <CreditWarning />
+
       <div className="flex flex-grow overflow-hidden relative">
 
         {/* Profile Dropdown - Integrated with sidebar */}
@@ -233,13 +237,13 @@ const Dashboard = () => {
                 </Link>
                 <Link
                   to="/dashboard/upgrade"
-                  className="flex items-center px-3 py-3 text-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-xl transition-all duration-medium mb-3"
+                  className="flex items-center px-3 py-3 text-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-xl transition-all duration-medium mb-1"
                   onClick={() => setIsProfileMenuOpen(false)}
                 >
                   <svg className="w-4 h-4 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                   </svg>
-                  Upgrade Plan
+                  Purchase Credits
                 </Link>
                 <hr className="my-3 border-outline-variant/20" />
                 <button
@@ -546,28 +550,45 @@ const Dashboard = () => {
 
         {/* Main Content */}
         <div
-          className="flex-1 overflow-y-auto"
+          className="flex-1 overflow-hidden"
           style={{
             marginLeft: '304px',
           }}
         >
-          <AnimatePresence mode="wait">
-            {!isAnyToolActive ? (
-              <motion.div
-                key="dashboard-home"
-                className="p-8 pt-12 bg-white dark:bg-gray-900"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                style={{
-                  minHeight: 'calc(100vh - 32px)',
-                  margin: '16px',
-                  marginLeft: '16px',
-                  borderRadius: '24px',
-                  backdropFilter: 'blur(10px)',
-                }}
-              >
+          {/* Main Content Container with Rounded Border */}
+          <motion.div
+            className="h-full bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border border-white/20 dark:border-violet-500/20 overflow-hidden"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{
+              duration: 0.5,
+              ease: [0.25, 0.46, 0.45, 0.94],
+              type: "spring",
+              stiffness: 300,
+              damping: 30
+            }}
+            style={{
+              minHeight: 'calc(100vh - 32px)',
+              margin: '16px',
+              marginLeft: '16px',
+              borderRadius: '32px',
+              boxShadow: '0 25px 50px rgba(139, 92, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+            }}
+          >
+            <AnimatePresence mode="wait">
+              {!isAnyToolActive ? (
+                <motion.div
+                  key="dashboard-home"
+                  className="p-8 pt-12 h-full overflow-y-auto"
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -30 }}
+                  transition={{
+                    duration: 0.5,
+                    ease: [0.25, 0.46, 0.45, 0.94],
+                    delay: 0.1
+                  }}
+                >
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -638,23 +659,31 @@ const Dashboard = () => {
             ) : (
               <motion.div
                 key="tool-content"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="h-full bg-white dark:bg-gray-900"
-                style={{
-                  minHeight: 'calc(100vh - 32px)',
-                  margin: '16px',
-                  marginLeft: '16px',
-                  borderRadius: '24px',
-                  backdropFilter: 'blur(10px)',
+                className="h-full overflow-y-auto"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -30 }}
+                transition={{
+                  duration: 0.5,
+                  ease: [0.25, 0.46, 0.45, 0.94],
+                  delay: 0.1
                 }}
               >
-                <Outlet />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{
+                    duration: 0.4,
+                    ease: [0.25, 0.46, 0.45, 0.94],
+                    delay: 0.2
+                  }}
+                >
+                  <Outlet />
+                </motion.div>
               </motion.div>
             )}
           </AnimatePresence>
+          </motion.div>
         </div>
       </div>
 

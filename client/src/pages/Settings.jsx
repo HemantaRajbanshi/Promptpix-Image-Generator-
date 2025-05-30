@@ -4,9 +4,10 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { authAPI } from '../services/api';
+import DashboardContentWrapper from '../components/DashboardContentWrapper';
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, completeLogout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('password');
@@ -62,11 +63,13 @@ const Settings = () => {
   };
 
   // Helper function to show notifications
-  const showNotification = (message, type = 'success') => {
+  const showNotification = (message, type = 'success', duration = 5000) => {
     setNotification({ message, type, show: true });
-    setTimeout(() => {
-      setNotification({ message: '', type: '', show: false });
-    }, 5000);
+    if (duration > 0) {
+      setTimeout(() => {
+        setNotification({ message: '', type: '', show: false });
+      }, duration);
+    }
   };
 
   const handlePasswordUpdate = async (e) => {
@@ -191,23 +194,27 @@ const Settings = () => {
       // Call delete account API
       await authAPI.deleteAccount(deleteAccountForm.password);
 
-      // Clear all local data
-      localStorage.clear();
-      sessionStorage.clear();
+      // Show success message immediately with longer duration
+      showNotification('🗑️ Account deleted successfully! Redirecting to home page...', 'success', 0); // 0 = no auto-hide
 
-      // Show success message and redirect
-      showNotification('🗑️ Account deleted successfully. You will be redirected to the home page.', 'success');
+      // Perform complete logout with full cleanup
+      await completeLogout();
 
-      // Redirect to home page after a delay
+      // Small delay to ensure cleanup is complete and user sees the success message
       setTimeout(() => {
-        navigate('/');
-      }, 3000);
+        // Navigate to the main landing page (public marketing content)
+        navigate('/', { replace: true });
+
+        // Force a page reload to ensure complete state reset
+        window.location.href = '/';
+      }, 2000);
 
     } catch (error) {
       console.error('Delete account error:', error);
       showNotification(error.message || 'Failed to delete account. Please try again.', 'error');
+      setIsLoading(false);
     }
-    setIsLoading(false);
+    // Note: Don't set loading to false in success case since we're redirecting
   };
 
   // Delete account state
@@ -225,7 +232,7 @@ const Settings = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 md:p-6">
+    <>
       {/* Notification Toast */}
       {notification.show && (
         <motion.div
@@ -235,31 +242,37 @@ const Settings = () => {
           className={`fixed top-6 right-6 z-50 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-sm border ${
             notification.type === 'error'
               ? 'bg-red-500/90 text-white border-red-400'
+              : notification.message.includes('Account deleted')
+              ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-400 shadow-green-500/25'
               : 'bg-emerald-500/90 text-white border-emerald-400'
           }`}
         >
           <div className="flex items-center">
             <span className="mr-3 text-lg">
-              {notification.type === 'error' ? '🚫' : '✅'}
+              {notification.type === 'error' ? '🚫' : notification.message.includes('Account deleted') ? '🗑️' : '✅'}
             </span>
             <span className="font-medium">{notification.message}</span>
-            <button
-              onClick={() => setNotification({ message: '', type: '', show: false })}
-              className="ml-4 text-white/80 hover:text-white transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            {!notification.message.includes('Account deleted') && (
+              <button
+                onClick={() => setNotification({ message: '', type: '', show: false })}
+                className="ml-4 text-white/80 hover:text-white transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
         </motion.div>
       )}
 
-      <div className="max-w-6xl mx-auto">
+      <DashboardContentWrapper>
+        <div className="max-w-6xl mx-auto">
         {/* Modern Header */}
         <motion.div
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="mb-10"
         >
           <div className="flex items-center space-x-4 mb-4">
@@ -305,10 +318,19 @@ const Settings = () => {
         {/* Content Cards */}
         <motion.div
           key={activeTab}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          initial={{ opacity: 0, y: 20, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{
+            duration: 0.4,
+            ease: [0.25, 0.46, 0.45, 0.94],
+            type: "spring",
+            stiffness: 300,
+            damping: 30
+          }}
           className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 shadow-2xl overflow-hidden"
+          style={{
+            boxShadow: '0 25px 50px rgba(139, 92, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+          }}
         >
           {activeTab === 'password' && (
             <div className="p-8 md:p-10">
@@ -1090,8 +1112,9 @@ const Settings = () => {
             </div>
           )}
         </motion.div>
-      </div>
-    </div>
+        </div>
+      </DashboardContentWrapper>
+    </>
   );
 };
 

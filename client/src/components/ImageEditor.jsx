@@ -1,286 +1,278 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import FilterTool from './FilterTool';
 import AdjustmentTool from './AdjustmentTool';
 import RotateTool from './RotateTool';
+import LoadingSpinner from './LoadingSpinner';
 import { addGalleryItem } from '../services/local-storage/gallery';
 import blobUrlManager from '../utils/blobUrlManager';
 import { downloadImage } from '../utils/download';
 import { useAuth } from '../context/AuthContext';
 
-const ImageEditor = ({ imageUrl, onClose, onSave }) => {
+const ImageEditor = ({ imageUrl, onClose }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
-  // State
+  // State management
   const [activeTab, setActiveTab] = useState('filters');
-  const [currentImageUrl, setCurrentImageUrl] = useState(null);
+  const [currentImageUrl, setCurrentImageUrl] = useState(imageUrl);
   const [isSaving, setIsSaving] = useState(false);
   const [showSavedMessage, setShowSavedMessage] = useState(false);
-  const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [error, setError] = useState(null);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [saveError, setSaveError] = useState(null);
+  const [canvasMode, setCanvasMode] = useState('virtual');
+  const [imagePreviewReady, setImagePreviewReady] = useState(false);
+  const [isInitializingCanvas, setIsInitializingCanvas] = useState(false);
 
   // Refs
   const canvasRef = useRef(null);
-  const imageRef = useRef(null);
-  const originalImageUrl = useRef(null);
+  const originalImageUrl = useRef(imageUrl);
   const savedMessageTimeoutRef = useRef(null);
+  const saveErrorTimeoutRef = useRef(null);
+  const virtualImageRef = useRef(null);
 
-  // History for undo/redo
-  const [history, setHistory] = useState([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-
-  // Add to history
-  const addToHistory = (url) => {
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(url);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  };
-
-  // Undo
-  const undo = () => {
-    if (historyIndex > 0) {
-      const prevIndex = historyIndex - 1;
-      const prevUrl = history[prevIndex];
-      setCurrentImageUrl(prevUrl);
-      setHistoryIndex(prevIndex);
-
-      // Load the previous image into canvas
-      const img = new Image();
-      img.onload = () => {
-        if (canvasRef.current) {
-          const canvas = canvasRef.current;
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          imageRef.current = img;
-        }
-      };
-      img.src = prevUrl;
-    }
-  };
-
-  // Redo
-  const redo = () => {
-    if (historyIndex < history.length - 1) {
-      const nextIndex = historyIndex + 1;
-      const nextUrl = history[nextIndex];
-      setCurrentImageUrl(nextUrl);
-      setHistoryIndex(nextIndex);
-
-      // Load the next image into canvas
-      const img = new Image();
-      img.onload = () => {
-        if (canvasRef.current) {
-          const canvas = canvasRef.current;
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          imageRef.current = img;
-        }
-      };
-      img.src = nextUrl;
-    }
-  };
-
-  // Initialize the editor
+  // Load virtual image immediately for preview
   useEffect(() => {
-    if (!imageUrl) {
-      setError('No image provided');
-      setIsInitializing(false);
+    if (imageUrl) {
+      console.log('🖼️ Loading virtual image for preview...');
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+
+      img.onload = () => {
+        console.log('✅ Virtual image loaded successfully');
+        virtualImageRef.current = img;
+        setImagePreviewReady(true);
+        setCurrentImageUrl(imageUrl);
+      };
+
+      img.onerror = () => {
+        console.error('❌ Failed to load virtual image');
+        setError('Failed to load image. Please check the image format and try again.');
+      };
+
+      img.src = imageUrl;
+    }
+  }, [imageUrl]);
+
+  // Canvas initialization function
+  const ensureCanvasReady = useCallback(() => {
+    if (!virtualImageRef.current || !canvasRef.current || isInitializingCanvas) {
       return;
     }
 
-    const initializeEditor = async () => {
-      try {
-        setIsInitializing(true);
-        setError(null);
-
-        // Store original image URL
-        originalImageUrl.current = imageUrl;
-
-        // Set current image URL
-        setCurrentImageUrl(imageUrl);
-
-        // Initialize history with original image
-        setHistory([imageUrl]);
-        setHistoryIndex(0);
-
-        // Load image into canvas
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-
-        img.onload = () => {
-          if (canvasRef.current) {
-            const canvas = canvasRef.current;
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-            // Set canvas dimensions to match image
-            canvas.width = img.width;
-            canvas.height = img.height;
-
-            // Draw image on canvas
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-            // Store reference to the image
-            imageRef.current = img;
-
-            setIsImageLoaded(true);
-            setIsInitializing(false);
-          }
-        };
-
-        img.onerror = () => {
-          setError('Failed to load image');
-          setIsInitializing(false);
-        };
-
-        img.src = imageUrl;
-      } catch (err) {
-        setError('Failed to initialize image editor');
-        setIsInitializing(false);
-      }
-    };
-
-    initializeEditor();
-
-    // Cleanup function
-    return () => {
-      // Clear any pending timeouts
-      if (savedMessageTimeoutRef.current) {
-        clearTimeout(savedMessageTimeoutRef.current);
-      }
-
-      // Clean up blob URLs from history (except original)
-      history.forEach(url => {
-        if (url !== originalImageUrl.current && url.startsWith('blob:')) {
-          blobUrlManager.revoke(url);
-        }
-      });
-    };
-  }, [imageUrl]);
-
-  // Handle save to gallery
-  const handleSaveToGallery = async () => {
-    if (!canvasRef.current || isSaving) return;
-
-    setIsSaving(true);
+    console.log('🎨 Initializing canvas for editing...');
+    setIsInitializingCanvas(true);
 
     try {
-      // Get the latest changes
-      canvasRef.current.toBlob(async (blob) => {
-        if (blob) {
-          try {
-            // Create a temporary URL for preview
-            const url = blobUrlManager.create(blob);
-            if (!url) {
-              console.error('Failed to create blob URL for gallery image');
-              setIsSaving(false);
-              return;
-            }
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      const img = virtualImageRef.current;
 
-            // Save to gallery with user ID
-            const result = await addGalleryItem({
-              imageUrl: url,
-              prompt: 'Edited image',
-              type: 'image-editor',
-              userId: user?.id || user?._id, // Associate with current user
-              blob: blob
-            });
-
-            // Dispatch custom event to notify other components
-            window.dispatchEvent(new CustomEvent('galleryUpdated'));
-
-            if (process.env.NODE_ENV !== 'production') {
-              console.log('Saved to gallery:', result);
-            }
-
-            // Show success message
-            setShowSavedMessage(true);
-            savedMessageTimeoutRef.current = setTimeout(() => {
-              setShowSavedMessage(false);
-            }, 3000);
-
-            // Call onSave callback if provided
-            if (onSave) {
-              onSave(blob);
-            }
-          } catch (error) {
-            console.error('Error saving to gallery:', error);
-            alert('Failed to save image to gallery. Please try again.');
-          } finally {
-            setIsSaving(false);
-          }
-        } else {
-          console.error('Failed to create blob from canvas');
-          setIsSaving(false);
-        }
-      }, 'image/png', 0.9);
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+      setCanvasMode('real');
+      console.log('✅ Canvas initialized successfully');
     } catch (error) {
-      console.error('Error in handleSaveToGallery:', error);
-      setIsSaving(false);
+      console.error('❌ Error initializing canvas:', error);
+    } finally {
+      setIsInitializingCanvas(false);
+    }
+  }, [isInitializingCanvas]);
+
+  // Handle image updates from tools
+  const handleImageUpdate = (newImageBlob) => {
+    if (!newImageBlob) return;
+
+    console.log('🔄 Updating image from tool...');
+
+    if (currentImageUrl && currentImageUrl !== originalImageUrl.current) {
+      blobUrlManager.revoke(currentImageUrl);
+    }
+
+    const newImageUrl = blobUrlManager.create(newImageBlob);
+    if (newImageUrl) {
+      setCurrentImageUrl(newImageUrl);
+      setCanvasMode('real');
+      console.log('✅ Image updated successfully');
     }
   };
 
   // Handle download
-  const handleDownload = () => {
-    if (!canvasRef.current) return;
+  const handleDownload = async () => {
+    try {
+      let blob;
 
-    canvasRef.current.toBlob((blob) => {
-      if (blob) {
-        downloadImage(blob, `edited-image-${Date.now()}.png`);
+      if (canvasMode === 'real' && canvasRef.current) {
+        await new Promise((resolve) => {
+          canvasRef.current.toBlob((canvasBlob) => {
+            blob = canvasBlob;
+            resolve();
+          }, 'image/png', 0.9);
+        });
+      } else if (virtualImageRef.current) {
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        const img = virtualImageRef.current;
+
+        tempCanvas.width = img.width;
+        tempCanvas.height = img.height;
+        tempCtx.drawImage(img, 0, 0);
+
+        await new Promise((resolve) => {
+          tempCanvas.toBlob((canvasBlob) => {
+            blob = canvasBlob;
+            resolve();
+          }, 'image/png', 0.9);
+        });
       }
-    }, 'image/png', 0.9);
+
+      if (blob) {
+        downloadImage(blob, 'promptpix-edited-image.png');
+      }
+    } catch (error) {
+      console.error('Error downloading image:', error);
+    }
   };
 
-  // Handle reset
-  const handleReset = () => {
-    if (!originalImageUrl.current || !canvasRef.current) return;
+  // Initialize canvas when image is ready
+  useEffect(() => {
+    if (imagePreviewReady && virtualImageRef.current && canvasMode === 'virtual') {
+      console.log('🚀 Image ready - initializing canvas for tools...');
+      setTimeout(() => {
+        ensureCanvasReady();
+      }, 200);
+    }
+  }, [imagePreviewReady, canvasMode, ensureCanvasReady]);
 
-    const img = new Image();
-    img.onload = () => {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      imageRef.current = img;
-      setCurrentImageUrl(originalImageUrl.current);
-
-      // Reset history
-      setHistory([originalImageUrl.current]);
-      setHistoryIndex(0);
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (savedMessageTimeoutRef.current) {
+        clearTimeout(savedMessageTimeoutRef.current);
+      }
+      if (saveErrorTimeoutRef.current) {
+        clearTimeout(saveErrorTimeoutRef.current);
+      }
     };
-    img.src = originalImageUrl.current;
+  }, []);
+
+  // Handle save to gallery with proper blob URL management
+  const handleSaveToGallery = async () => {
+    if (isSaving) return;
+
+    setIsSaving(true);
+    console.log('💾 Starting save to gallery process...');
+
+    setError(null);
+    setSaveError(null);
+
+    try {
+      let blob;
+
+      if (canvasMode === 'real' && canvasRef.current) {
+        console.log('📸 Using real canvas for save');
+        await new Promise((resolve) => {
+          canvasRef.current.toBlob((canvasBlob) => {
+            blob = canvasBlob;
+            resolve();
+          }, 'image/png', 0.9);
+        });
+      } else if (virtualImageRef.current) {
+        console.log('🖼️ Converting virtual image to blob');
+
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        const img = virtualImageRef.current;
+
+        tempCanvas.width = img.width;
+        tempCanvas.height = img.height;
+        tempCtx.drawImage(img, 0, 0);
+
+        await new Promise((resolve) => {
+          tempCanvas.toBlob((canvasBlob) => {
+            blob = canvasBlob;
+            resolve();
+          }, 'image/png', 0.9);
+        });
+      } else if (currentImageUrl) {
+        console.log('🌐 Fetching image from URL as fallback');
+        try {
+          const response = await fetch(currentImageUrl);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          blob = await response.blob();
+        } catch (fetchError) {
+          console.error('❌ Failed to fetch image:', fetchError);
+          throw new Error('Failed to load image for saving');
+        }
+      }
+
+      if (!blob) {
+        throw new Error('No image data available to save');
+      }
+
+      console.log('✅ Successfully created blob for saving');
+
+      const url = blobUrlManager.create(blob);
+      if (!url) {
+        throw new Error('Failed to create blob URL for gallery image');
+      }
+
+      const result = await addGalleryItem({
+        imageUrl: url,
+        prompt: 'Edited image',
+        type: 'image-editor',
+        userId: user?.id || user?._id,
+        blob: blob
+      });
+
+      window.dispatchEvent(new CustomEvent('galleryUpdated'));
+
+      console.log('✅ Successfully saved to gallery:', result);
+
+      setError(null);
+      setSaveError(null);
+
+      setShowSavedMessage(true);
+
+      setTimeout(() => {
+        setShowSavedMessage(false);
+        console.log('🚀 Redirecting to gallery...');
+
+        onClose();
+
+        setTimeout(() => {
+          navigate('/dashboard/gallery');
+        }, 300);
+      }, 1500);
+
+      console.log('✅ Save operation completed successfully');
+
+    } catch (error) {
+      console.error('❌ Error saving to gallery:', error);
+      setSaveError(`Failed to save image: ${error.message}`);
+
+      saveErrorTimeoutRef.current = setTimeout(() => {
+        setSaveError(null);
+      }, 5000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  // Tab configuration
-  const tabs = [
-    { id: 'filters', label: 'Filters', icon: '🎨' },
-    { id: 'adjust', label: 'Adjust', icon: '⚙️' },
-    { id: 'rotate', label: 'Rotate', icon: '🔄' }
-  ];
+  // Cleanup blob URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      if (currentImageUrl && currentImageUrl !== originalImageUrl.current) {
+        blobUrlManager.revoke(currentImageUrl);
+      }
+    };
+  }, [currentImageUrl]);
 
-  if (isInitializing) {
-    return (
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
-        <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20 dark:border-gray-700/30">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="w-12 h-12 border-4 border-violet-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-gray-700 dark:text-gray-300 font-medium">Loading Image Editor...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // Only show full-screen error for critical errors
   if (error) {
     return (
       <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -306,333 +298,394 @@ const ImageEditor = ({ imageUrl, onClose, onSave }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      {/* Success Message */}
-      <AnimatePresence>
-        {showSavedMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -50, scale: 0.9 }}
-            className="fixed top-8 left-1/2 transform -translate-x-1/2 z-60 bg-green-500 text-white px-6 py-3 rounded-2xl shadow-lg font-medium"
-          >
-            ✅ Image saved to gallery successfully!
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Editor Container */}
+    <div className="fixed inset-0 bg-gradient-to-br from-black/90 via-violet-900/20 to-purple-900/30 backdrop-blur-xl z-50 flex items-center justify-center p-4">
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        className="w-full h-full max-w-7xl max-h-[95vh] bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/30 overflow-hidden flex flex-col"
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+        className="bg-white/10 dark:bg-black/20 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 dark:border-violet-500/30 w-full max-w-7xl h-[92vh] flex flex-col overflow-hidden"
+        style={{
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(139,92,246,0.1) 50%, rgba(168,85,247,0.1) 100%)',
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 25px 50px -12px rgba(139, 92, 246, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+        }}
       >
         {/* Header */}
-        <div className="flex-shrink-0 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 backdrop-blur-xl p-6 border-b border-white/20 dark:border-gray-700/30">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-violet-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Image Editor</h2>
-                <p className="text-gray-600 dark:text-gray-400">Edit and enhance your images with professional tools</p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              {/* Undo/Redo buttons */}
-              <div className="flex items-center space-x-2">
-                <motion.button
-                  onClick={undo}
-                  disabled={historyIndex <= 0}
-                  className="p-3 text-gray-600 dark:text-gray-300 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  title="Undo"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                  </svg>
-                </motion.button>
-
-                <motion.button
-                  onClick={redo}
-                  disabled={historyIndex >= history.length - 1}
-                  className="p-3 text-gray-600 dark:text-gray-300 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  title="Redo"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
-                  </svg>
-                </motion.button>
-              </div>
-
-              {/* Download button */}
-              <motion.button
-                onClick={handleDownload}
-                className="p-3 text-gray-600 dark:text-gray-300 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                title="Download"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-              </motion.button>
-
-              {/* Reset button */}
-              <motion.button
-                onClick={handleReset}
-                className="p-3 text-gray-600 dark:text-gray-300 hover:text-orange-600 dark:hover:text-orange-400 transition-colors"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                title="Reset to Original"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </motion.button>
-
-              {/* Close button */}
-              <motion.button
-                onClick={onClose}
-                className="p-3 text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </motion.button>
+        <div className="flex items-center justify-between p-6 border-b border-white/10 dark:border-violet-500/20 bg-gradient-to-r from-violet-600/20 via-purple-600/20 to-indigo-600/20 backdrop-blur-sm">
+          <div className="flex items-center space-x-4">
+            <motion.div
+              className="w-14 h-14 bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-xl border border-white/20"
+              whileHover={{ scale: 1.05, rotate: 5 }}
+              transition={{ duration: 0.2 }}
+            >
+              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a1 1 0 01-1-1V9a1 1 0 011-1h1a2 2 0 100-4H4a1 1 0 01-1-1V4a1 1 0 011-1h3a1 1 0 001-1v-1a2 2 0 114 0z" />
+              </svg>
+            </motion.div>
+            <div>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-white via-violet-100 to-purple-100 bg-clip-text text-transparent">
+                Image Editor
+              </h2>
+              <p className="text-white/70 text-sm font-medium">Edit and enhance your images with professional tools</p>
             </div>
           </div>
+          <motion.button
+            onClick={onClose}
+            className="p-3 hover:bg-white/10 dark:hover:bg-violet-500/20 rounded-xl transition-all duration-200 border border-white/10 hover:border-white/20 backdrop-blur-sm"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <svg className="w-6 h-6 text-white/80 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </motion.button>
         </div>
 
-        {/* Main content */}
-        <div className="flex flex-1 min-h-0">
-          {/* Canvas area */}
-          <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
-            <div className="relative max-w-full max-h-full">
-              {/* Canvas Container */}
-              <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-3xl border border-white/30 dark:border-gray-700/30 shadow-2xl p-4">
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-purple-500/5 rounded-3xl" />
-                <div className="relative">
-                  <canvas
-                    ref={canvasRef}
-                    className="max-w-full max-h-[70vh] rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50"
-                    style={{
-                      maxWidth: '100%',
-                      maxHeight: '70vh',
-                      objectFit: 'contain'
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Tools panel */}
-          <div className="w-80 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border-l border-white/20 dark:border-gray-700/30 flex flex-col">
-            {/* Tool tabs */}
-            <div className="flex-shrink-0 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 backdrop-blur-xl p-4 border-b border-white/20 dark:border-gray-700/30">
-              <div className="grid grid-cols-3 gap-2">
-                {tabs.map((tab) => (
+        {/* Main Content */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Panel - Tools */}
+          <div className="w-96 bg-white/5 dark:bg-black/10 backdrop-blur-xl border-r border-white/10 dark:border-violet-500/20 flex flex-col">
+            {/* Tab Navigation */}
+            <div className="p-6 border-b border-white/10 dark:border-violet-500/20">
+              <div className="flex space-x-1 bg-white/10 dark:bg-black/20 rounded-2xl p-1.5 backdrop-blur-sm border border-white/10">
+                {[
+                  { id: 'filters', label: 'Filters', icon: '🎨' },
+                  { id: 'adjustments', label: 'Adjust', icon: '⚙️' },
+                  { id: 'rotate', label: 'Rotate', icon: '🔄' }
+                ].map((tab) => (
                   <motion.button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`p-3 rounded-xl font-medium transition-all duration-300 ${
+                    className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
                       activeTab === tab.id
-                        ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg'
-                        : 'bg-white/50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-white/70 dark:hover:bg-gray-700/70'
+                        ? 'bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 text-white shadow-xl border border-white/20'
+                        : 'text-white/70 hover:text-white hover:bg-white/10 dark:hover:bg-violet-500/20'
                     }`}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
+                    transition={{ duration: 0.2 }}
                   >
-                    <div className="flex flex-col items-center space-y-1">
-                      <span className="text-base">{tab.icon}</span>
-                      <span className="text-xs">{tab.label}</span>
-                    </div>
+                    <span className="text-lg">{tab.icon}</span>
+                    <span className="text-sm font-medium">{tab.label}</span>
                   </motion.button>
                 ))}
               </div>
             </div>
 
-            {/* Active tool */}
-            <div className="flex-1 overflow-y-auto p-4 min-h-0">
-
+            {/* Tool Content */}
+            <div className="flex-1 overflow-hidden">
               {activeTab === 'filters' && (
                 <FilterTool
                   imageUrl={currentImageUrl}
+                  onSave={handleImageUpdate}
                   canvasRef={canvasRef}
-                  onSave={(blob) => {
-                    if (blob) {
-                      // Update the current image with the filtered version
-                      if (currentImageUrl && currentImageUrl.startsWith('blob:')) {
-                        blobUrlManager.revoke(currentImageUrl);
-                      }
-
-                      const url = blobUrlManager.create(blob);
-                      if (url) {
-                        setCurrentImageUrl(url);
-                        addToHistory(url);
-                      } else {
-                        console.error('Failed to create blob URL for filtered image');
-                        return;
-                      }
-
-                      // Load the filtered image into the canvas
-                      const img = new Image();
-                      img.onload = () => {
-                        if (canvasRef.current) {
-                          const canvas = canvasRef.current;
-                          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-                          // Set canvas dimensions to match image
-                          canvas.width = img.width;
-                          canvas.height = img.height;
-
-                          // Draw image on canvas
-                          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-                          // Store reference to the image
-                          imageRef.current = img;
-                        }
-                      };
-                      img.src = url;
-                    }
-                  }}
                 />
               )}
-
-              {activeTab === 'adjust' && (
+              {activeTab === 'adjustments' && (
                 <AdjustmentTool
                   imageUrl={currentImageUrl}
+                  onSave={handleImageUpdate}
                   canvasRef={canvasRef}
-                  onSave={(blob) => {
-                    if (blob) {
-                      // Update the current image with the adjusted version
-                      if (currentImageUrl && currentImageUrl.startsWith('blob:')) {
-                        blobUrlManager.revoke(currentImageUrl);
-                      }
-
-                      const url = blobUrlManager.create(blob);
-                      if (url) {
-                        setCurrentImageUrl(url);
-                        addToHistory(url);
-                      } else {
-                        console.error('Failed to create blob URL for adjusted image');
-                        return;
-                      }
-
-                      // Load the adjusted image into the canvas
-                      const img = new Image();
-                      img.onload = () => {
-                        if (canvasRef.current) {
-                          const canvas = canvasRef.current;
-                          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-                          // Set canvas dimensions to match image
-                          canvas.width = img.width;
-                          canvas.height = img.height;
-
-                          // Draw image on canvas
-                          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-                          // Store reference to the image
-                          imageRef.current = img;
-                        }
-                      };
-                      img.src = url;
-                    }
-                  }}
                 />
               )}
-
               {activeTab === 'rotate' && (
                 <RotateTool
                   imageUrl={currentImageUrl}
+                  onSave={handleImageUpdate}
                   canvasRef={canvasRef}
-                  onSave={(blob) => {
-                    if (blob) {
-                      // Update the current image with the rotated version
-                      if (currentImageUrl && currentImageUrl.startsWith('blob:')) {
-                        blobUrlManager.revoke(currentImageUrl);
-                      }
-
-                      const url = blobUrlManager.create(blob);
-                      if (url) {
-                        setCurrentImageUrl(url);
-                        addToHistory(url);
-                      } else {
-                        console.error('Failed to create blob URL for rotated image');
-                        return;
-                      }
-
-                      // Load the rotated image into the canvas
-                      const img = new Image();
-                      img.onload = () => {
-                        if (canvasRef.current) {
-                          const canvas = canvasRef.current;
-                          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-                          // Set canvas dimensions to match image
-                          canvas.width = img.width;
-                          canvas.height = img.height;
-
-                          // Draw image on canvas
-                          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-                          // Store reference to the image
-                          imageRef.current = img;
-
-                          // Save the changes
-                          if (onSave) {
-                            onSave(blob);
-                          }
-                        }
-                      };
-                      img.src = url;
-                    }
-                  }}
                 />
               )}
             </div>
+          </div>
 
-            {/* Modern Save to Gallery Button */}
-            <div className="flex-shrink-0 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 backdrop-blur-xl p-4 border-t border-white/20 dark:border-gray-700/30">
-              <motion.button
-                onClick={handleSaveToGallery}
-                disabled={isSaving}
-                className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white py-4 rounded-2xl font-semibold shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {isSaving ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span>Saving to Gallery...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span>Save to Gallery</span>
-                  </>
-                )}
-              </motion.button>
+          {/* Right Panel - Image Preview */}
+          <div className="flex-1 flex flex-col relative overflow-hidden">
+            {/* Canvas Background with Gradient */}
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-900/20 via-purple-900/30 to-indigo-900/20 backdrop-blur-sm" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-violet-500/10 via-transparent to-purple-500/10" />
+
+            {/* Preview Area */}
+            <div className="relative flex-1 flex items-center justify-center p-8">
+              {imagePreviewReady ? (
+                <motion.div
+                  className="relative"
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                >
+                  {/* Canvas Container with Enhanced Styling */}
+                  <div
+                    className="relative bg-white/10 dark:bg-black/20 backdrop-blur-2xl rounded-3xl p-6 border border-white/20 dark:border-violet-500/30 shadow-2xl"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(139,92,246,0.1) 50%, rgba(168,85,247,0.15) 100%)',
+                      backdropFilter: 'blur(25px)',
+                      boxShadow: '0 30px 60px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 0 0 1px rgba(139, 92, 246, 0.1)'
+                    }}
+                  >
+                    {/* Inner Canvas Frame */}
+                    <div className="relative bg-gradient-to-br from-white/5 to-transparent rounded-2xl p-4 border border-white/10">
+                      {/* Virtual Image Preview */}
+                      {canvasMode === 'virtual' && virtualImageRef.current && (
+                        <motion.img
+                          src={currentImageUrl}
+                          alt="Image preview"
+                          className="max-w-full max-h-full object-contain rounded-2xl shadow-xl"
+                          style={{
+                            maxHeight: 'calc(100vh - 400px)',
+                            maxWidth: 'calc(100vw - 500px)',
+                            filter: 'drop-shadow(0 20px 40px rgba(0, 0, 0, 0.3))'
+                          }}
+                          whileHover={{ scale: 1.02 }}
+                          transition={{ duration: 0.3 }}
+                        />
+                      )}
+
+                      {/* Real Canvas */}
+                      <motion.canvas
+                        ref={canvasRef}
+                        className={`max-w-full max-h-full object-contain rounded-2xl shadow-xl ${
+                          canvasMode === 'real' ? 'block' : 'hidden'
+                        }`}
+                        style={{
+                          maxHeight: 'calc(100vh - 400px)',
+                          maxWidth: 'calc(100vw - 500px)',
+                          filter: 'drop-shadow(0 20px 40px rgba(0, 0, 0, 0.3))'
+                        }}
+                        whileHover={{ scale: 1.02 }}
+                        transition={{ duration: 0.3 }}
+                      />
+
+                      {/* Canvas Overlay Effects */}
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-black/5 via-transparent to-white/5 pointer-events-none" />
+                      <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10 pointer-events-none" />
+                    </div>
+
+                    {/* Corner Decorations */}
+                    <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-white/30 rounded-tl-lg" />
+                    <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-white/30 rounded-tr-lg" />
+                    <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-white/30 rounded-bl-lg" />
+                    <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-white/30 rounded-br-lg" />
+                  </div>
+
+                  {/* Floating Canvas Info */}
+                  <motion.div
+                    className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 bg-white/10 dark:bg-black/20 backdrop-blur-xl rounded-2xl px-4 py-2 border border-white/20 shadow-xl"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.2 }}
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(139,92,246,0.1) 100%)',
+                      backdropFilter: 'blur(20px)',
+                      boxShadow: '0 10px 25px rgba(139, 92, 246, 0.15)'
+                    }}
+                  >
+                    <div className="flex items-center space-x-2 text-white/80 text-sm font-medium">
+                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                      <span>Ready for editing</span>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  className="flex flex-col items-center justify-center space-y-8"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  {/* Enhanced Loading Animation */}
+                  <div className="relative">
+                    {/* Outer Ring */}
+                    <div className="w-32 h-32 rounded-full border-4 border-white/10 relative">
+                      <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-violet-500 border-r-purple-500 animate-spin" />
+                    </div>
+
+                    {/* Inner Ring */}
+                    <div className="absolute inset-4 w-24 h-24 rounded-full border-4 border-white/5 relative">
+                      <div className="absolute inset-0 rounded-full border-4 border-transparent border-b-indigo-500 border-l-violet-400 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
+                    </div>
+
+                    {/* Center Pulse */}
+                    <div className="absolute inset-8 w-16 h-16 bg-gradient-to-br from-violet-500/30 to-purple-500/30 rounded-full animate-pulse" />
+
+                    {/* Floating Particles */}
+                    <div className="absolute inset-0">
+                      {[...Array(6)].map((_, i) => (
+                        <motion.div
+                          key={i}
+                          className="absolute w-2 h-2 bg-violet-400/60 rounded-full"
+                          style={{
+                            top: '50%',
+                            left: '50%',
+                            transformOrigin: '0 0'
+                          }}
+                          animate={{
+                            rotate: [0, 360],
+                            scale: [0.5, 1, 0.5],
+                            opacity: [0.3, 1, 0.3]
+                          }}
+                          transition={{
+                            duration: 3,
+                            repeat: Infinity,
+                            delay: i * 0.5,
+                            ease: "easeInOut"
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Loading Text */}
+                  <motion.div
+                    className="text-center bg-white/10 dark:bg-black/20 backdrop-blur-xl rounded-3xl px-8 py-6 border border-white/20 shadow-xl"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(139,92,246,0.1) 100%)',
+                      backdropFilter: 'blur(20px)',
+                      boxShadow: '0 20px 40px rgba(139, 92, 246, 0.15)'
+                    }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.2 }}
+                  >
+                    <h3 className="text-2xl font-bold bg-gradient-to-r from-white via-violet-100 to-purple-100 bg-clip-text text-transparent mb-3">
+                      Loading Image
+                    </h3>
+                    <p className="text-white/70 text-sm font-medium mb-2">Preparing your image for editing</p>
+                    <div className="flex items-center justify-center space-x-2 text-violet-300 text-xs">
+                      <div className="w-1 h-1 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-1 h-1 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
             </div>
+
+            {/* Action Buttons */}
+            <motion.div
+              className="relative p-6 border-t border-white/10 dark:border-violet-500/20"
+              style={{
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(139,92,246,0.08) 50%, rgba(168,85,247,0.08) 100%)',
+                backdropFilter: 'blur(25px)'
+              }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.3 }}
+            >
+              {/* Background Glow */}
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-500/5 via-purple-500/10 to-indigo-500/5 rounded-b-3xl" />
+
+              <div className="relative flex space-x-4">
+                {/* Download Button */}
+                <motion.button
+                  onClick={handleDownload}
+                  className="flex-1 relative overflow-hidden bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500 hover:from-blue-600 hover:via-cyan-600 hover:to-teal-600 text-white py-4 rounded-2xl font-semibold shadow-xl border border-white/20 transition-all duration-300 flex items-center justify-center space-x-3 group"
+                  whileHover={{ scale: 1.02, y: -3 }}
+                  whileTap={{ scale: 0.98 }}
+                  style={{
+                    boxShadow: '0 15px 35px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                  }}
+                >
+                  {/* Button Glow Effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 via-cyan-400/20 to-teal-400/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                  <svg className="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span className="font-semibold relative z-10">Download</span>
+
+                  {/* Shimmer Effect */}
+                  <div className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 group-hover:animate-shimmer" />
+                </motion.button>
+
+                {/* Save to Gallery Button */}
+                <motion.button
+                  onClick={handleSaveToGallery}
+                  disabled={isSaving}
+                  className="flex-1 relative overflow-hidden bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-700 hover:via-purple-700 hover:to-indigo-700 text-white py-4 rounded-2xl font-semibold shadow-xl border border-white/20 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 group"
+                  whileHover={{ scale: isSaving ? 1 : 1.02, y: isSaving ? 0 : -3 }}
+                  whileTap={{ scale: 0.98 }}
+                  style={{
+                    boxShadow: '0 15px 35px rgba(139, 92, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                  }}
+                >
+                  {/* Button Glow Effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-violet-400/20 via-purple-400/20 to-indigo-400/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                  {isSaving ? (
+                    <>
+                      <LoadingSpinner size="h-5 w-5" color="text-white" />
+                      <span className="font-semibold relative z-10">Saving to Gallery...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span className="font-semibold relative z-10">Save to Gallery</span>
+
+                      {/* Shimmer Effect */}
+                      <div className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 group-hover:animate-shimmer" />
+                    </>
+                  )}
+                </motion.button>
+              </div>
+
+              {/* Bottom Accent Line */}
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-24 h-1 bg-gradient-to-r from-violet-500 via-purple-500 to-indigo-500 rounded-full opacity-60" />
+            </motion.div>
           </div>
         </div>
+
+        {/* Success Message */}
+        <AnimatePresence>
+          {showSavedMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -50, scale: 0.9 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="fixed top-8 left-1/2 transform -translate-x-1/2 z-60 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 text-white px-8 py-4 rounded-2xl shadow-2xl font-semibold border border-white/20 backdrop-blur-xl"
+              style={{
+                boxShadow: '0 20px 40px rgba(34, 197, 94, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+              }}
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <span>Image saved to gallery successfully!</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Save Error Toast */}
+        <AnimatePresence>
+          {saveError && (
+            <motion.div
+              initial={{ opacity: 0, y: -50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -50, scale: 0.9 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="fixed top-8 left-1/2 transform -translate-x-1/2 z-60 bg-gradient-to-r from-red-500 via-rose-500 to-pink-500 text-white px-8 py-4 rounded-2xl shadow-2xl font-semibold max-w-md text-center border border-white/20 backdrop-blur-xl"
+              style={{
+                boxShadow: '0 20px 40px rgba(239, 68, 68, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+              }}
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <span>{saveError}</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );

@@ -1,14 +1,29 @@
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react';
 import MasonryGallery from '../components/MasonryGallery';
+import SkeletonLoader from '../components/SkeletonLoader';
+import DashboardContentWrapper from '../components/DashboardContentWrapper';
 
 const Gallery = () => {
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Simulate initial loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 md:p-6">
+    <DashboardContentWrapper>
       <div className="max-w-7xl mx-auto">
         {/* Modern Header */}
         <motion.div
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="mb-10"
         >
           <div className="flex items-center space-x-4 mb-4">
@@ -27,16 +42,38 @@ const Gallery = () => {
         </motion.div>
 
         {/* Gallery Content */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 shadow-2xl overflow-hidden"
-        >
-          <MasonryGallery />
-        </motion.div>
+        <AnimatePresence mode="wait">
+          {isLoading ? (
+            <motion.div
+              key="gallery-loading"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="p-6"
+            >
+              <SkeletonLoader type="gallery" count={12} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="gallery-content"
+              initial={{ opacity: 0, y: 20, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.98 }}
+              transition={{
+                duration: 0.5,
+                ease: [0.25, 0.46, 0.45, 0.94],
+                type: "spring",
+                stiffness: 300,
+                damping: 30
+              }}
+            >
+              <MasonryGallery />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </div>
+    </DashboardContentWrapper>
   );
 };
 

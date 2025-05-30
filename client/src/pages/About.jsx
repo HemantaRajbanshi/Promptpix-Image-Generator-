@@ -84,7 +84,7 @@ const About = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-surface text-on-surface">
+    <div className="min-h-screen bg-surface text-on-surface pt-16 md:pt-20">
       {/* Hero Section */}
       <Section
         id="about-hero"

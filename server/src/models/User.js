@@ -24,6 +24,28 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 10
   },
+  initialCreditsGranted: {
+    type: Boolean,
+    default: true // Set to true since we're giving 10 credits by default
+  },
+  creditHistory: [{
+    operation: {
+      type: String,
+      required: true
+    },
+    amount: {
+      type: Number,
+      required: true
+    },
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    description: {
+      type: String,
+      default: ''
+    }
+  }],
   profilePicture: {
     type: String,
     default: ''

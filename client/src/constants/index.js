@@ -27,6 +27,19 @@ export const USER_CONFIG = {
   MAX_DISPLAY_NAME_LENGTH: 50,
 };
 
+// Credit Configuration
+export const CREDIT_CONFIG = {
+  OPERATION_COST: 2, // Credits required per AI operation
+  LOW_CREDIT_THRESHOLD: 5, // Show warning when credits are at or below this
+  OPERATIONS: {
+    TEXT_TO_IMAGE: 2,
+    UPSCALE: 2,
+    UNCROP: 2,
+    REMOVE_BACKGROUND: 2,
+    IMAGE_EDITOR: 0, // Image editor is free
+  },
+};
+
 // Local Storage Keys
 export const STORAGE_KEYS = {
   GALLERY: 'promptpix_gallery',

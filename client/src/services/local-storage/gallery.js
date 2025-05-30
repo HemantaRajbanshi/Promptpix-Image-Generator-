@@ -1,5 +1,5 @@
 import { generateId } from './index';
-import { STORAGE_KEYS, IMAGE_CONFIG } from '../../constants';
+import { STORAGE_KEYS, IMAGE_CONFIG, UI_CONFIG } from '../../constants';
 
 // Key for storing gallery items in localStorage
 const GALLERY_STORAGE_KEY = STORAGE_KEYS.GALLERY;
@@ -236,19 +236,23 @@ const blobToBase64 = async (blob, options = {}) => {
     };
 
     img.onerror = (error) => {
-      // Clean up the blob URL on error
-      URL.revokeObjectURL(img.src);
+      // Clean up the blob URL on error with delay
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+      }, 1000);
       reject(error);
     };
 
     // Create a blob URL
     const blobUrl = URL.createObjectURL(blob);
 
-    // Set up onload to clean up the blob URL after use
+    // Set up onload to clean up the blob URL after use with delay
     const originalOnload = img.onload;
     img.onload = function() {
-      // Clean up the blob URL after the image is loaded
-      URL.revokeObjectURL(blobUrl);
+      // Schedule cleanup after a delay to prevent race conditions
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+      }, 1000); // 1 second delay for internal blob URLs
 
       // Call the original onload handler
       if (originalOnload) {
@@ -275,11 +279,15 @@ export const addGalleryItem = async (item) => {
   try {
     const items = getGalleryItems();
 
-    // Create new item with ID, timestamp, and user association
+    const createdAt = new Date().toISOString();
+
+    // Create new item with ID, timestamp, user association, and interaction tracking
     const newItem = {
       id: generateId(),
-      createdAt: new Date().toISOString(),
+      createdAt,
       userId: item.userId || null, // Associate with user
+      viewCount: 0, // Initialize view count for smart sorting
+      lastViewed: createdAt, // Initialize last viewed to creation time
       ...item
     };
 
@@ -300,10 +308,14 @@ export const addGalleryItem = async (item) => {
         // We don't need to store the blob in localStorage
         delete newItem.blob;
 
-        // We also don't need the temporary URL in localStorage
+        // Keep the blob URL for gallery display - don't delete it from the item
+        // The gallery component needs this URL to display the image
         if (newItem.imageUrl && newItem.imageUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(newItem.imageUrl);
-          delete newItem.imageUrl;
+          // Schedule cleanup after a longer delay to allow gallery navigation and rendering
+          setTimeout(() => {
+            URL.revokeObjectURL(newItem.imageUrl);
+          }, 10000); // 10 second delay to ensure gallery has time to render
+          // DON'T delete newItem.imageUrl - the gallery component needs it
         }
       } catch (conversionError) {
         console.error('Error converting image:', conversionError);
@@ -313,10 +325,13 @@ export const addGalleryItem = async (item) => {
         newItem.conversionError = true;
         newItem.errorMessage = 'Image was too large to store in gallery';
 
-        // Clean up resources
+        // Clean up resources with delay but keep URL for gallery
         if (newItem.imageUrl && newItem.imageUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(newItem.imageUrl);
-          delete newItem.imageUrl;
+          // Schedule cleanup after a delay to allow navigation to complete
+          setTimeout(() => {
+            URL.revokeObjectURL(newItem.imageUrl);
+          }, 10000); // Increased delay for error cases too
+          // DON'T delete newItem.imageUrl - the gallery component needs it
         }
         delete newItem.blob;
       }
@@ -359,7 +374,7 @@ export const addGalleryItem = async (item) => {
 /**
  * Get gallery items for a specific user
  * @param {string} userId - User ID to filter by
- * @returns {Array} Array of gallery items for the user
+ * @returns {Array} Array of gallery items for the user with backward compatibility
  */
 export const getUserGalleryItems = (userId) => {
   try {
@@ -368,6 +383,12 @@ export const getUserGalleryItems = (userId) => {
     const items = getGalleryItems();
     return items
       .filter(item => item.userId === userId)
+      .map(item => ({
+        ...item,
+        // Ensure backward compatibility with existing gallery items
+        viewCount: item.viewCount || 0,
+        lastViewed: item.lastViewed || item.createdAt
+      }))
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // Newest first
   } catch (error) {
     console.error('Error getting user gallery items:', error);
@@ -442,6 +463,37 @@ export const getGalleryItemById = (itemId) => {
 };
 
 /**
+ * Update gallery item interaction (view count and last viewed timestamp)
+ * @param {string} itemId - ID of the item to update
+ * @returns {Object|null} Updated gallery item or null if not found
+ */
+export const updateGalleryItemInteraction = (itemId) => {
+  try {
+    const items = getGalleryItems();
+    const itemIndex = items.findIndex(item => item.id === itemId);
+
+    if (itemIndex === -1) {
+      return null;
+    }
+
+    // Update interaction data
+    items[itemIndex] = {
+      ...items[itemIndex],
+      viewCount: (items[itemIndex].viewCount || 0) + 1,
+      lastViewed: new Date().toISOString()
+    };
+
+    // Save updated items
+    saveGalleryItems(items);
+
+    return items[itemIndex];
+  } catch (error) {
+    console.error('Error updating gallery item interaction:', error);
+    return null;
+  }
+};
+
+/**
  * Update a gallery item
  * @param {string} itemId - ID of the item to update
  * @param {Object} updates - Updates to apply to the item
@@ -471,6 +523,168 @@ export const updateGalleryItem = (itemId, updates) => {
     console.error('Error updating gallery item:', error);
     return null;
   }
+};
+
+/**
+ * Calculate Levenshtein distance between two strings
+ * @param {string} str1 - First string
+ * @param {string} str2 - Second string
+ * @returns {number} Levenshtein distance
+ */
+const levenshteinDistance = (str1, str2) => {
+  const matrix = [];
+  const len1 = str1.length;
+  const len2 = str2.length;
+
+  // Initialize matrix
+  for (let i = 0; i <= len1; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= len2; j++) {
+    matrix[0][j] = j;
+  }
+
+  // Fill matrix
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      if (str1.charAt(i - 1) === str2.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1,     // insertion
+          matrix[i - 1][j] + 1      // deletion
+        );
+      }
+    }
+  }
+
+  return matrix[len1][len2];
+};
+
+/**
+ * Check if a word matches a target with fuzzy matching
+ * @param {string} word - Word to match
+ * @param {string} target - Target string
+ * @param {number} threshold - Maximum allowed distance (default: 2)
+ * @returns {Object} Match result with score and type
+ */
+const fuzzyMatch = (word, target, threshold = 2) => {
+  const wordLower = word.toLowerCase();
+  const targetLower = target.toLowerCase();
+
+  // Exact match (highest score)
+  if (wordLower === targetLower) {
+    return { matches: true, score: 100, type: 'exact' };
+  }
+
+  // Substring match (high score)
+  if (targetLower.includes(wordLower) || wordLower.includes(targetLower)) {
+    return { matches: true, score: 80, type: 'substring' };
+  }
+
+  // Fuzzy match using Levenshtein distance
+  const distance = levenshteinDistance(wordLower, targetLower);
+  if (distance <= threshold) {
+    const score = Math.max(0, 60 - (distance * 20)); // Score decreases with distance
+    return { matches: true, score, type: 'fuzzy' };
+  }
+
+  return { matches: false, score: 0, type: 'none' };
+};
+
+/**
+ * Search gallery items with fuzzy pattern matching
+ * @param {Array} items - Gallery items to search
+ * @param {string} searchQuery - Search query
+ * @returns {Array} Filtered and ranked search results
+ */
+export const searchGalleryItems = (items, searchQuery) => {
+  if (!searchQuery || searchQuery.trim() === '') {
+    return items;
+  }
+
+  const query = searchQuery.trim().toLowerCase();
+  const searchTokens = query.split(/\s+/).filter(token => token.length > 0);
+
+  if (searchTokens.length === 0) {
+    return items;
+  }
+
+  const results = [];
+
+  // Performance optimization: limit complex operations for large galleries
+  const maxItemsForFuzzySearch = 100;
+  const shouldUseFuzzySearch = items.length <= maxItemsForFuzzySearch;
+
+  for (const item of items) {
+    const prompt = (item.prompt || '').toLowerCase();
+    const type = (item.type || '').toLowerCase();
+    const searchableText = `${prompt} ${type}`;
+
+    let totalScore = 0;
+    let matchedTokens = 0;
+    const tokenMatches = [];
+
+    // Check each search token against the item
+    for (const token of searchTokens) {
+      let bestMatch = { matches: false, score: 0, type: 'none' };
+
+      // Split searchable text into words for token matching
+      const words = searchableText.split(/\s+/).filter(word => word.length > 0);
+
+      for (const word of words) {
+        let match;
+
+        if (shouldUseFuzzySearch) {
+          // Use fuzzy matching for smaller galleries
+          match = fuzzyMatch(token, word);
+        } else {
+          // Use only substring matching for larger galleries (performance)
+          const tokenLower = token.toLowerCase();
+          const wordLower = word.toLowerCase();
+
+          if (wordLower === tokenLower) {
+            match = { matches: true, score: 100, type: 'exact' };
+          } else if (wordLower.includes(tokenLower) || tokenLower.includes(wordLower)) {
+            match = { matches: true, score: 80, type: 'substring' };
+          } else {
+            match = { matches: false, score: 0, type: 'none' };
+          }
+        }
+
+        if (match.matches && match.score > bestMatch.score) {
+          bestMatch = match;
+        }
+      }
+
+      if (bestMatch.matches) {
+        matchedTokens++;
+        totalScore += bestMatch.score;
+        tokenMatches.push({ token, match: bestMatch });
+      }
+    }
+
+    // Require at least 60% of tokens to match
+    const matchPercentage = matchedTokens / searchTokens.length;
+    if (matchPercentage >= 0.6) {
+      // Calculate final score based on match quality and percentage
+      const averageScore = totalScore / matchedTokens;
+      const finalScore = averageScore * matchPercentage;
+
+      results.push({
+        ...item,
+        searchScore: finalScore,
+        matchedTokens,
+        totalTokens: searchTokens.length,
+        matchPercentage,
+        tokenMatches
+      });
+    }
+  }
+
+  // Sort by search score (highest first)
+  return results.sort((a, b) => b.searchScore - a.searchScore);
 };
 
 /**
