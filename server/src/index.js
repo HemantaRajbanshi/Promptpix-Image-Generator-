@@ -30,15 +30,14 @@ const connectToMongoDB = async () => {
       console.log('Connected to MongoDB');
     }
   } catch (err) {
-    console.error('MongoDB connection error:', err);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('MongoDB connection error:', err);
+    }
 
     // For development purposes, we can continue without MongoDB
     // In a production environment, you would want to exit the process
     if (process.env.NODE_ENV === 'production') {
-      console.error('Exiting process due to MongoDB connection failure in production');
       process.exit(1);
-    } else {
-      console.log('Attempting to continue without MongoDB...');
     }
   }
 };

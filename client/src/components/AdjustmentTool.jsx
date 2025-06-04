@@ -279,7 +279,6 @@ const AdjustmentTool = ({ imageUrl, canvasRef, onSave }) => {
         setIsApplying(false);
       }, 'image/png', 0.95);
     } catch (error) {
-      console.error('Error applying adjustments:', error);
       setIsApplying(false);
     }
   };

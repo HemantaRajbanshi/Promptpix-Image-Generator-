@@ -18,8 +18,6 @@ router.use(authController.protect);
 
 // ClipDrop API routes with credit validation (2 credits per operation)
 router.post('/text-to-image', validateCredits(2, 'text-to-image'), clipdropController.textToImage);
-router.post('/upscale', validateCredits(2, 'upscale'), upload.single('image_file'), clipdropController.upscaleImage);
-router.post('/uncrop', validateCredits(2, 'uncrop'), upload.single('image_file'), clipdropController.uncropImage);
 router.post('/remove-background', validateCredits(2, 'remove-background'), upload.single('image_file'), clipdropController.removeBackground);
 
 module.exports = router;

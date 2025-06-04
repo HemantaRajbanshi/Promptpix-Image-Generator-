@@ -6,7 +6,7 @@ import AdjustmentTool from './AdjustmentTool';
 import RotateTool from './RotateTool';
 import LoadingSpinner from './LoadingSpinner';
 import { addGalleryItem } from '../services/local-storage/gallery';
-import blobUrlManager from '../utils/blobUrlManager';
+import blobUrlManager from '../utils/blobURLManager';
 import { downloadImage } from '../utils/download';
 import { useAuth } from '../context/AuthContext';
 
@@ -35,19 +35,16 @@ const ImageEditor = ({ imageUrl, onClose }) => {
   // Load virtual image immediately for preview
   useEffect(() => {
     if (imageUrl) {
-      console.log('🖼️ Loading virtual image for preview...');
       const img = new Image();
       img.crossOrigin = 'anonymous';
 
       img.onload = () => {
-        console.log('✅ Virtual image loaded successfully');
         virtualImageRef.current = img;
         setImagePreviewReady(true);
         setCurrentImageUrl(imageUrl);
       };
 
       img.onerror = () => {
-        console.error('❌ Failed to load virtual image');
         setError('Failed to load image. Please check the image format and try again.');
       };
 
@@ -61,7 +58,6 @@ const ImageEditor = ({ imageUrl, onClose }) => {
       return;
     }
 
-    console.log('🎨 Initializing canvas for editing...');
     setIsInitializingCanvas(true);
 
     try {
@@ -73,9 +69,8 @@ const ImageEditor = ({ imageUrl, onClose }) => {
       canvas.height = img.height;
       ctx.drawImage(img, 0, 0);
       setCanvasMode('real');
-      console.log('✅ Canvas initialized successfully');
     } catch (error) {
-      console.error('❌ Error initializing canvas:', error);
+      setError('Failed to initialize canvas for editing');
     } finally {
       setIsInitializingCanvas(false);
     }
@@ -85,8 +80,6 @@ const ImageEditor = ({ imageUrl, onClose }) => {
   const handleImageUpdate = (newImageBlob) => {
     if (!newImageBlob) return;
 
-    console.log('🔄 Updating image from tool...');
-
     if (currentImageUrl && currentImageUrl !== originalImageUrl.current) {
       blobUrlManager.revoke(currentImageUrl);
     }
@@ -95,7 +88,6 @@ const ImageEditor = ({ imageUrl, onClose }) => {
     if (newImageUrl) {
       setCurrentImageUrl(newImageUrl);
       setCanvasMode('real');
-      console.log('✅ Image updated successfully');
     }
   };
 
@@ -132,14 +124,13 @@ const ImageEditor = ({ imageUrl, onClose }) => {
         downloadImage(blob, 'promptpix-edited-image.png');
       }
     } catch (error) {
-      console.error('Error downloading image:', error);
+      setError('Failed to download image');
     }
   };
 
   // Initialize canvas when image is ready
   useEffect(() => {
     if (imagePreviewReady && virtualImageRef.current && canvasMode === 'virtual') {
-      console.log('🚀 Image ready - initializing canvas for tools...');
       setTimeout(() => {
         ensureCanvasReady();
       }, 200);
@@ -163,7 +154,6 @@ const ImageEditor = ({ imageUrl, onClose }) => {
     if (isSaving) return;
 
     setIsSaving(true);
-    console.log('💾 Starting save to gallery process...');
 
     setError(null);
     setSaveError(null);
@@ -172,7 +162,6 @@ const ImageEditor = ({ imageUrl, onClose }) => {
       let blob;
 
       if (canvasMode === 'real' && canvasRef.current) {
-        console.log('📸 Using real canvas for save');
         await new Promise((resolve) => {
           canvasRef.current.toBlob((canvasBlob) => {
             blob = canvasBlob;
@@ -180,7 +169,6 @@ const ImageEditor = ({ imageUrl, onClose }) => {
           }, 'image/png', 0.9);
         });
       } else if (virtualImageRef.current) {
-        console.log('🖼️ Converting virtual image to blob');
 
         const tempCanvas = document.createElement('canvas');
         const tempCtx = tempCanvas.getContext('2d');
@@ -197,7 +185,6 @@ const ImageEditor = ({ imageUrl, onClose }) => {
           }, 'image/png', 0.9);
         });
       } else if (currentImageUrl) {
-        console.log('🌐 Fetching image from URL as fallback');
         try {
           const response = await fetch(currentImageUrl);
           if (!response.ok) {
@@ -205,7 +192,6 @@ const ImageEditor = ({ imageUrl, onClose }) => {
           }
           blob = await response.blob();
         } catch (fetchError) {
-          console.error('❌ Failed to fetch image:', fetchError);
           throw new Error('Failed to load image for saving');
         }
       }
@@ -213,8 +199,6 @@ const ImageEditor = ({ imageUrl, onClose }) => {
       if (!blob) {
         throw new Error('No image data available to save');
       }
-
-      console.log('✅ Successfully created blob for saving');
 
       const url = blobUrlManager.create(blob);
       if (!url) {
@@ -231,8 +215,6 @@ const ImageEditor = ({ imageUrl, onClose }) => {
 
       window.dispatchEvent(new CustomEvent('galleryUpdated'));
 
-      console.log('✅ Successfully saved to gallery:', result);
-
       setError(null);
       setSaveError(null);
 
@@ -240,7 +222,6 @@ const ImageEditor = ({ imageUrl, onClose }) => {
 
       setTimeout(() => {
         setShowSavedMessage(false);
-        console.log('🚀 Redirecting to gallery...');
 
         onClose();
 
@@ -249,10 +230,7 @@ const ImageEditor = ({ imageUrl, onClose }) => {
         }, 300);
       }, 1500);
 
-      console.log('✅ Save operation completed successfully');
-
     } catch (error) {
-      console.error('❌ Error saving to gallery:', error);
       setSaveError(`Failed to save image: ${error.message}`);
 
       saveErrorTimeoutRef.current = setTimeout(() => {

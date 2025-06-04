@@ -204,68 +204,7 @@ exports.textToImage = async (req, res) => {
   }
 };
 
-// Image upscaling
-exports.upscaleImage = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'Please provide an image file'
-      });
-    }
 
-    const formData = new FormData();
-    formData.append('image_file', req.file.buffer, {
-      filename: req.file.originalname,
-      contentType: req.file.mimetype
-    });
-
-    // Add target dimensions if provided
-    if (req.body.target_width && req.body.target_height) {
-      formData.append('target_width', req.body.target_width);
-      formData.append('target_height', req.body.target_height);
-    }
-
-    await makeClipDropRequest('/image-upscaling/v1/upscale', formData, req, res);
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error.message
-    });
-  }
-};
-
-// Image uncropping
-exports.uncropImage = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'Please provide an image file'
-      });
-    }
-
-    const formData = new FormData();
-    formData.append('image_file', req.file.buffer, {
-      filename: req.file.originalname,
-      contentType: req.file.mimetype
-    });
-
-    // Add uncrop parameters
-    const extendPixels = req.body.extend_pixels || 200;
-    formData.append('extend_left', req.body.extend_left || extendPixels);
-    formData.append('extend_right', req.body.extend_right || extendPixels);
-    formData.append('extend_up', req.body.extend_up || extendPixels);
-    formData.append('extend_down', req.body.extend_down || extendPixels);
-
-    await makeClipDropRequest('/uncrop/v1', formData, req, res);
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error.message
-    });
-  }
-};
 
 // Background removal
 exports.removeBackground = async (req, res) => {

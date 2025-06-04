@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import LoadingSpinner from './LoadingSpinner';
-import blobUrlManager from '../utils/blobUrlManager';
+import blobUrlManager from '../utils/blobURLManager.js';
 
 const FilterTool = ({ imageUrl, canvasRef, onSave }) => {
   // State

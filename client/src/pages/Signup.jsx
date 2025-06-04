@@ -18,7 +18,6 @@ const Signup = () => {
   const [validationErrors, setValidationErrors] = useState({});
   const [isFormValid, setIsFormValid] = useState(false);
   const navigate = useNavigate();
-
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {

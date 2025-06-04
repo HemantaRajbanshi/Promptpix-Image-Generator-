@@ -1,31 +1,18 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import CreditsDisplay from '../components/CreditsDisplay';
-import CreditWarning from '../components/CreditWarning';
-import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import { motion, AnimatePresence} from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 
 const Dashboard = () => {
-  const { user, logout, creditsLoading, refreshCredits } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { scrollY } = useScroll();
+  const { user, logout } = useAuth();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [showRefreshSuccess, setShowRefreshSuccess] = useState(false);
   const profileMenuRef = useRef(null);
   const mouseLeaveTimeoutRef = useRef(null);
 
-  // Listen for credits refresh success
-  useEffect(() => {
-    const handleCreditsRefreshed = () => {
-      setShowRefreshSuccess(true);
-      setTimeout(() => setShowRefreshSuccess(false), 2000);
-    };
-
-    window.addEventListener('creditsRefreshed', handleCreditsRefreshed);
-    return () => window.removeEventListener('creditsRefreshed', handleCreditsRefreshed);
-  }, []);
+  
 
   // Handle click outside to close profile menu
   useEffect(() => {
@@ -60,7 +47,7 @@ const Dashboard = () => {
       await logout();
       navigate('/');
     } catch (error) {
-      console.error('Logout failed:', error);
+      // Handle logout error silently
     }
   };
 
@@ -82,8 +69,6 @@ const Dashboard = () => {
 
   const tools = [
     { id: 'text-to-image', name: 'Text to Image', path: '/dashboard/text-to-image', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
-    { id: 'upscale', name: 'Upscale', path: '/dashboard/upscale', icon: 'M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5' },
-    { id: 'uncrop', name: 'Uncrop', path: '/dashboard/uncrop', icon: 'M4 8v8a2 2 0 002 2h12a2 2 0 002-2V8m-4-4v8m-12 0V4a2 2 0 012-2h12a2 2 0 012 2v4' },
     { id: 'remove-bg', name: 'Remove Background', path: '/dashboard/remove-bg', icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z' },
     { id: 'image-editor', name: 'Image Editor', path: '/dashboard/image-editor', icon: 'M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z' },
   ];
@@ -190,7 +175,6 @@ const Dashboard = () => {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-surface-dim dark:bg-black">
       {/* Credit Warning */}
-      <CreditWarning />
 
       <div className="flex flex-grow overflow-hidden relative">
 
@@ -235,16 +219,7 @@ const Dashboard = () => {
                   </svg>
                   Settings
                 </Link>
-                <Link
-                  to="/dashboard/upgrade"
-                  className="flex items-center px-3 py-3 text-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-xl transition-all duration-medium mb-1"
-                  onClick={() => setIsProfileMenuOpen(false)}
-                >
-                  <svg className="w-4 h-4 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                  </svg>
-                  Purchase Credits
-                </Link>
+               
                 <hr className="my-3 border-outline-variant/20" />
                 <button
                   onClick={() => {
@@ -335,74 +310,7 @@ const Dashboard = () => {
                 <h1 className="text-2xl font-bold text-on-surface tracking-tight transition-colors duration-medium group-hover:text-primary-40">
                   PromptPix
                 </h1>
-                <div className="flex items-center mt-1">
-                  <div className={`w-2 h-2 rounded-full mr-2 transition-colors duration-300 ${
-                    creditsLoading ? 'bg-blue-500 animate-pulse' :
-                    (user?.credits || 0) > 10 ? 'bg-green-500' :
-                    (user?.credits || 0) > 5 ? 'bg-yellow-500' :
-                    (user?.credits || 0) > 0 ? 'bg-orange-500' : 'bg-red-500'
-                  }`}></div>
-                  <span className="text-sm text-on-surface-variant font-medium flex items-center">
-                    {creditsLoading ? (
-                      <motion.span
-                        animate={{ opacity: [0.5, 1, 0.5] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                      >
-                        Loading...
-                      </motion.span>
-                    ) : (
-                      user?.credits || 0
-                    )}
-                  </span>
-                  <motion.button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      refreshCredits();
-                    }}
-                    className={`ml-2 p-1 rounded-full transition-colors duration-200 ${
-                      showRefreshSuccess
-                        ? 'bg-green-100 hover:bg-green-200'
-                        : 'hover:bg-surface-container-high'
-                    }`}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    disabled={creditsLoading}
-                    title="Refresh credits"
-                  >
-                    <AnimatePresence mode="wait">
-                      {showRefreshSuccess ? (
-                        <motion.svg
-                          key="success"
-                          className="w-3 h-3 text-green-600"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          initial={{ scale: 0, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </motion.svg>
-                      ) : (
-                        <motion.svg
-                          key="refresh"
-                          className="w-3 h-3 text-on-surface-variant"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          animate={creditsLoading ? { rotate: 360 } : {}}
-                          transition={creditsLoading ? { duration: 1, repeat: Infinity, ease: "linear" } : {}}
-                          initial={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0, opacity: 0 }}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </motion.svg>
-                      )}
-                    </AnimatePresence>
-                  </motion.button>
-                </div>
+                <p className="text-sm text-on-surface-variant">AI Image Processing Platform</p>
               </motion.div>
             </Link>
             <div className="flex items-center justify-between">

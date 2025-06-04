@@ -16,35 +16,7 @@ const DashboardTools = () => {
         </div>
       </div>
 
-      {/* Upscale Card */}
-      <div className="card-modern flex flex-col space-y-4 p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <svg className="w-6 h-6 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-            <h3 className="text-xl font-display">Upscale</h3>
-          </div>
-        </div>
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          Click to start using Upscale
-        </div>
-      </div>
-
-      {/* Uncrop Card */}
-      <div className="card-modern flex flex-col space-y-4 p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <svg className="w-6 h-6 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8v8a4 4 0 004 4h8m-4-16v8m0 0l3-3m-3 3l-3-3" />
-            </svg>
-            <h3 className="text-xl font-display">Uncrop</h3>
-          </div>
-        </div>
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          Click to start using Uncrop
-        </div>
-      </div>
+  
 
       {/* Remove Background Card */}
       <div className="card-modern flex flex-col space-y-4 p-6">

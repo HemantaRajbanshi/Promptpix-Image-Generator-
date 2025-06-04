@@ -41,12 +41,11 @@ const MasonryGallery = () => {
 
       // Clean up any blob URLs that might still be in memory
       if (window._blobUrlsToRevoke && window._blobUrlsToRevoke.length > 0) {
-        console.log(`Cleaning up ${window._blobUrlsToRevoke.length} blob URLs on unmount`);
         window._blobUrlsToRevoke.forEach(url => {
           try {
             URL.revokeObjectURL(url);
           } catch (error) {
-            console.error('Error revoking blob URL:', error);
+            // Ignore cleanup errors
           }
         });
         window._blobUrlsToRevoke = [];
@@ -95,7 +94,6 @@ const MasonryGallery = () => {
       const items = getUserGalleryItems(userId);
       setGalleryItems(items);
     } catch (error) {
-      console.error('Error loading user gallery items:', error);
       setError('Failed to load your images');
       setGalleryItems([]);
     } finally {
@@ -114,7 +112,7 @@ const MasonryGallery = () => {
         setSelectedItem(null);
       }
     } catch (error) {
-      console.error('Error deleting gallery item:', error);
+      // Ignore deletion errors
     }
   };
 
@@ -138,7 +136,6 @@ const MasonryGallery = () => {
       // Set selected item to open modal
       setSelectedItem(item);
     } catch (error) {
-      console.error('Error tracking image interaction:', error);
       // Still open the modal even if tracking fails
       setSelectedItem(item);
     }
@@ -163,11 +160,9 @@ const MasonryGallery = () => {
         // Download high-quality PNG
         downloadImage(blob, `promptpix-${item.id}.png`);
       } else {
-        console.error('No image data available for download');
         alert('Unable to download this image. The image data is not available.');
       }
     } catch (error) {
-      console.error('Error downloading image:', error);
       alert('Failed to download image. Please try again.');
     }
   };
@@ -182,7 +177,6 @@ const MasonryGallery = () => {
 
       // Validate timestamps
       if (isNaN(createdAt) || isNaN(lastViewed)) {
-        console.warn('Invalid timestamp found in item:', item.id);
         return Number.MAX_SAFE_INTEGER; // Push invalid items to the end
       }
 
@@ -196,7 +190,6 @@ const MasonryGallery = () => {
 
       return timeSinceCreation + timeSinceViewed - viewCountBonus;
     } catch (error) {
-      console.error('Error calculating smart score for item:', item.id, error);
       return Number.MAX_SAFE_INTEGER; // Push errored items to the end
     }
   };
@@ -446,13 +439,11 @@ const MasonryGallery = () => {
                       alt={item.prompt || 'Generated image'}
                       className="w-full h-full object-cover absolute inset-0"
                       onError={(e) => {
-                        console.error('Image failed to load:', item.id);
                         // Try to recover the image if possible
                         if (item.blob && !item.imageData) {
                           try {
                             // Create a new URL from the blob
                             const newUrl = URL.createObjectURL(item.blob);
-                            console.log('Recovering image with new blob URL');
 
                             // Store the URL for cleanup when the component unmounts
                             if (!window._blobUrlsToRevoke) {
@@ -488,7 +479,7 @@ const MasonryGallery = () => {
                             e.target.src = newUrl;
                             return;
                           } catch (blobError) {
-                            console.error('Failed to recover image from blob:', blobError);
+                            // Ignore blob recovery errors
                           }
                         }
                         // Fallback to placeholder

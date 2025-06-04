@@ -1,6 +1,6 @@
 # PromptPix 🖼️✨
 
-PromptPix is a modern web application that provides powerful AI-powered image generation and editing tools. Transform your creative process with text-to-image generation, image upscaling, uncropping, background removal, and more.
+PromptPix is a modern web application that provides powerful AI-powered image generation and editing tools. Transform your creative process with text-to-image generation, background removal, and comprehensive image editing.
 
 ## 🎮 Demo
 
@@ -13,8 +13,6 @@ Visit our [live demo](https://promptpix-demo.vercel.app) to try out PromptPix wi
 ### AI Image Tools
 
 - **Text to Image**: Generate stunning images from text descriptions using advanced AI models
-- **Image Upscaling**: Enhance image resolution and quality without losing details
-- **Image Uncropping**: Expand your images beyond their original boundaries with AI-powered content generation
 - **Background Removal**: Automatically remove backgrounds from images with precision
 - **Image Editor**: Edit your images with a comprehensive set of tools
 

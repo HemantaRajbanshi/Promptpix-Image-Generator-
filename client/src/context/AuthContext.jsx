@@ -19,20 +19,17 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // Check if user is logged in (token exists)
     const token = localStorage.getItem('token');
-    console.log('AuthContext initialized, token exists:', !!token);
 
     if (token) {
       // Fetch current user data
       fetchCurrentUser();
     } else {
-      console.log('No token found, skipping user data fetch');
       setLoading(false);
     }
 
     // Cleanup function to clear any pending timers when component unmounts
     return () => {
       if (updateTimerRef.current) {
-        console.log('Cleaning up pending update timer');
         clearTimeout(updateTimerRef.current);
         updateTimerRef.current = null;
       }
@@ -157,7 +154,6 @@ export const AuthProvider = ({ children }) => {
 
       // Login with API
       const response = await authAPI.login({ email, password });
-      console.log('Login response:', response);
 
       if (response && response.data && response.data.user) {
         // Ensure the user object has all required fields
@@ -175,35 +171,14 @@ export const AuthProvider = ({ children }) => {
           imagesEdited: response.data.user.imagesEdited || 0
         };
 
-        console.log('Processed user data after login:', userData);
         setUser(userData);
       } else {
-        console.error('Invalid user data in login response:', response);
-
-        // For development, create a mock user if no valid response
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('Creating mock user after login...');
-          const mockUser = {
-            id: 'mock-user-id',
-            _id: 'mock-user-id',
-            email: email,
-            displayName: email.split('@')[0],
-            credits: 100,
-            profilePicture: '',
-            bio: '',
-            imagesGenerated: 0,
-            imagesEdited: 0,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-          setUser(mockUser);
-        }
+        throw new Error('Invalid response from server. Please try again.');
       }
 
       setLoading(false);
       return response.data.user;
     } catch (err) {
-      console.error('Login error:', err);
       setLoading(false);
       setError(err.message);
       throw err;
@@ -226,7 +201,6 @@ export const AuthProvider = ({ children }) => {
 
       // Register with API
       const response = await authAPI.register({ email, password, displayName });
-      console.log('Signup response:', response);
 
       if (response && response.data && response.data.user) {
         // Ensure the user object has all required fields
@@ -244,35 +218,14 @@ export const AuthProvider = ({ children }) => {
           imagesEdited: response.data.user.imagesEdited || 0
         };
 
-        console.log('Processed user data after signup:', userData);
         setUser(userData);
       } else {
-        console.error('Invalid user data in signup response:', response);
-
-        // For development, create a mock user if no valid response
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('Creating mock user after signup...');
-          const mockUser = {
-            id: 'mock-user-id',
-            _id: 'mock-user-id',
-            email: email,
-            displayName: displayName,
-            credits: 100,
-            profilePicture: '',
-            bio: '',
-            imagesGenerated: 0,
-            imagesEdited: 0,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-          setUser(mockUser);
-        }
+        throw new Error('Invalid response from server. Please try again.');
       }
 
       setLoading(false);
       return response.data.user;
     } catch (err) {
-      console.error('Signup error:', err);
       setLoading(false);
       setError(err.message);
       throw err;
@@ -284,7 +237,7 @@ export const AuthProvider = ({ children }) => {
     try {
       await authAPI.logout();
     } catch (err) {
-      console.error('Logout error:', err);
+      // Ignore logout errors - we'll clear local state anyway
     } finally {
       // Clear user data regardless of API response
       setUser(null);
@@ -302,7 +255,7 @@ export const AuthProvider = ({ children }) => {
     try {
       await authAPI.logout();
     } catch (err) {
-      console.error('Logout error:', err);
+      // Ignore logout errors - we'll clear local state anyway
     } finally {
       // Clear user data
       setUser(null);
@@ -347,8 +300,6 @@ export const AuthProvider = ({ children }) => {
     const MIN_UPDATE_INTERVAL = 2000; // 2 seconds
 
     if (timeSinceLastUpdate < MIN_UPDATE_INTERVAL) {
-      console.log(`Debouncing update request. Last update was ${timeSinceLastUpdate}ms ago`);
-
       // Update UI optimistically without making API call
       const allowedFields = {};
       Object.keys(updatedUserData).forEach(key => {
@@ -381,7 +332,6 @@ export const AuthProvider = ({ children }) => {
 
     // If we're past the debounce period, proceed with the update
     setLoading(true);
-    console.log('updateUser called with:', updatedUserData);
 
     try {
       // If we have the current user, only send fields that have actually changed
@@ -410,8 +360,6 @@ export const AuthProvider = ({ children }) => {
 
       // Only make API call if there are actual changes
       if (Object.keys(changedFields).length > 0) {
-        console.log('Sending changes to server:', changedFields);
-
         try {
           // Update user with API
           const response = await userAPI.updateProfile(changedFields);
@@ -419,20 +367,15 @@ export const AuthProvider = ({ children }) => {
           // Update the last update time
           lastUpdateTimeRef.current = Date.now();
 
-          console.log('Server response:', response.data);
-
           // Update local state with the full user object returned from server
           setUser(response.data.user);
         } catch (apiError) {
-          console.log('API Error in updateUser:', apiError);
-
           // Check if it's a throttling error (contains throttle or 429 in the message)
           if (apiError.message && (
             apiError.message.toLowerCase().includes('throttle') ||
             apiError.message.toLowerCase().includes('too many') ||
             apiError.message.includes('429')
           )) {
-            console.log('Throttling error detected, updating UI optimistically');
 
             // Update the UI optimistically anyway
             setUser(prev => ({
@@ -499,14 +442,11 @@ export const AuthProvider = ({ children }) => {
           }));
           return true;
         } else {
-          console.error('Invalid response from useCredits API:', response);
           setError('Failed to use credits: Invalid server response');
           return false;
         }
       }
     } catch (err) {
-      console.error('Error using credits:', err);
-
       // For development mode, allow credit usage even if the API fails
       if (process.env.NODE_ENV !== 'production') {
         // Update the user credits locally
@@ -550,7 +490,6 @@ export const AuthProvider = ({ children }) => {
       }
       return false;
     } catch (err) {
-      console.error('Error refreshing credits:', err);
       // Don't set error for credit refresh failures to avoid disrupting UX
       return false;
     } finally {

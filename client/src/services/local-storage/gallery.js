@@ -47,9 +47,6 @@ export const saveGalleryItems = (items) => {
 
       // Strategy 2: Reduce to fewer items
       () => {
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('Trying with fewer items...');
-        }
         itemsToSave = items.slice(0, 10);
         return JSON.stringify(itemsToSave);
       },
@@ -116,31 +113,19 @@ export const saveGalleryItems = (items) => {
 
         // Check if the serialized data is too large (localStorage typically has ~5MB limit)
         if (getStringByteSize(serializedData) > 4000000) { // ~4MB safety threshold
-          // Use less verbose logging in production
-          if (process.env.NODE_ENV !== 'production') {
-            console.warn(`Strategy ${i+1} produced data too large for localStorage, trying next strategy...`);
-          }
           continue;
         }
 
         localStorage.setItem(GALLERY_STORAGE_KEY, serializedData);
-        if (i > 0 && process.env.NODE_ENV !== 'production') {
-          console.log(`Successfully saved gallery items using strategy ${i+1}`);
-        }
         return true;
       } catch (e) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn(`Strategy ${i+1} failed:`, e.message);
-        }
         // Continue to next strategy
       }
     }
 
     // If we get here, all strategies failed
-    console.error('All storage strategies failed. Unable to save gallery items.');
     return false;
   } catch (error) {
-    console.error('Error saving gallery items:', error);
     return false;
   }
 };
@@ -318,8 +303,6 @@ export const addGalleryItem = async (item) => {
           // DON'T delete newItem.imageUrl - the gallery component needs it
         }
       } catch (conversionError) {
-        console.error('Error converting image:', conversionError);
-
         // Fallback: store a reference to the image type without the actual data
         newItem.imageData = null;
         newItem.conversionError = true;
@@ -359,7 +342,6 @@ export const addGalleryItem = async (item) => {
 
     return newItem;
   } catch (error) {
-    console.error('Error adding gallery item:', error);
     return {
       id: generateId(),
       createdAt: new Date().toISOString(),
@@ -391,7 +373,6 @@ export const getUserGalleryItems = (userId) => {
       }))
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // Newest first
   } catch (error) {
-    console.error('Error getting user gallery items:', error);
     return [];
   }
 };
@@ -409,9 +390,7 @@ export const getUserStatistics = (userId) => {
 
     const imagesGenerated = userItems.filter(item =>
       item.type === 'text-to-image' ||
-      item.type === 'upscale' ||
-      item.type === 'remove-bg' ||
-      item.type === 'uncrop'
+      item.type === 'remove-bg'
     ).length;
 
     const imagesEdited = userItems.filter(item =>
@@ -457,7 +436,6 @@ export const getGalleryItemById = (itemId) => {
     const items = getGalleryItems();
     return items.find(item => item.id === itemId) || null;
   } catch (error) {
-    console.error('Error getting gallery item:', error);
     return null;
   }
 };
@@ -488,7 +466,6 @@ export const updateGalleryItemInteraction = (itemId) => {
 
     return items[itemIndex];
   } catch (error) {
-    console.error('Error updating gallery item interaction:', error);
     return null;
   }
 };
@@ -520,7 +497,6 @@ export const updateGalleryItem = (itemId, updates) => {
 
     return items[itemIndex];
   } catch (error) {
-    console.error('Error updating gallery item:', error);
     return null;
   }
 };
@@ -696,7 +672,6 @@ export const clearGallery = () => {
     saveGalleryItems([]);
     return true;
   } catch (error) {
-    console.error('Error clearing gallery:', error);
     return false;
   }
 };

@@ -239,70 +239,7 @@ export const clipdropAPI = {
     return response.blob();
   },
 
-  // Upscale image
-  upscaleImage: async (imageFile, targetWidth, targetHeight) => {
-    const formData = new FormData();
-    formData.append('image_file', imageFile);
 
-    if (targetWidth && targetHeight) {
-      formData.append('target_width', targetWidth);
-      formData.append('target_height', targetHeight);
-    }
-
-    const response = await fetch(`${API_URL}/clipdrop/upscale`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)}`,
-      },
-      body: formData,
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      try {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to upscale image');
-      } catch (jsonError) {
-        // Handle non-JSON error responses
-        throw new Error(`Failed to upscale image: ${response.status} ${response.statusText}`);
-      }
-    }
-
-    return response.blob();
-  },
-
-  // Uncrop image
-  uncropImage: async (imageFile, extendOptions = {}) => {
-    const formData = new FormData();
-    formData.append('image_file', imageFile);
-
-    // Add extend options if provided
-    if (extendOptions.extend_left) formData.append('extend_left', extendOptions.extend_left);
-    if (extendOptions.extend_right) formData.append('extend_right', extendOptions.extend_right);
-    if (extendOptions.extend_up) formData.append('extend_up', extendOptions.extend_up);
-    if (extendOptions.extend_down) formData.append('extend_down', extendOptions.extend_down);
-
-    const response = await fetch(`${API_URL}/clipdrop/uncrop`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-      body: formData,
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      try {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to uncrop image');
-      } catch (jsonError) {
-        // Handle non-JSON error responses
-        throw new Error(`Failed to uncrop image: ${response.status} ${response.statusText}`);
-      }
-    }
-
-    return response.blob();
-  },
 
   // Remove background
   removeBackground: async (imageFile) => {

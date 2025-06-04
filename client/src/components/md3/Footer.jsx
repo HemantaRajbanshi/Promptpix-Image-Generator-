@@ -94,16 +94,6 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/dashboard/upscale" className="body-medium text-on-surface-variant hover:text-primary-40 transition-colors">
-                  Image Upscaling
-                </Link>
-              </li>
-              <li>
-                <Link to="/dashboard/uncrop" className="body-medium text-on-surface-variant hover:text-primary-40 transition-colors">
-                  Image Uncropping
-                </Link>
-              </li>
-              <li>
                 <Link to="/dashboard/remove-bg" className="body-medium text-on-surface-variant hover:text-primary-40 transition-colors">
                   Background Removal
                 </Link>

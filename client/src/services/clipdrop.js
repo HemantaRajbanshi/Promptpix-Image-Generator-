@@ -3,8 +3,6 @@
  *
  * This service provides integration with the ClipDrop API for various image processing tasks:
  * - Text-to-Image generation
- * - Image upscaling
- * - Image uncropping
  * - Background removal
  *
  * Each function includes robust error handling and fallback mechanisms.
@@ -83,119 +81,11 @@ export const generateImage = async (prompt, options = {}) => {
   }
 };
 
-/**
- * Upscale an image to higher resolution
- * @param {File} imageFile - Image file to upscale
- * @returns {Promise<Blob>} - Upscaled image as blob
- */
-export const upscaleImage = async (imageFile) => {
-  // Calculate target dimensions
-  const targetWidth = Math.min(imageFile.width * 2 || 2048, 4096);
-  const targetHeight = Math.min(imageFile.height * 2 || 2048, 4096);
 
-  try {
-    // Call the secure API proxy
-    const imageBlob = await clipdropAPI.upscaleImage(imageFile, targetWidth, targetHeight);
-    return imageBlob;
-  } catch (error) {
-    // Create fallback upscaled image
 
-    // Load the original image
-    const imageUrl = await readFileAsDataURL(imageFile);
-    const img = await loadImage(imageUrl);
 
-    // Create canvas with 2x dimensions
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width * 2;
-    canvas.height = img.height * 2;
-    const ctx = canvas.getContext('2d');
 
-    // Draw image at 2x size with smoothing
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    // Apply sharpening filter
-    applySharpening(ctx, canvas.width, canvas.height);
-
-    // Add label
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.font = '16px Arial';
-    ctx.textAlign = 'right';
-    ctx.fillText('Upscaled 2x (API Error)', canvas.width - 10, canvas.height - 10);
-
-    // Convert canvas to blob
-    return new Promise((resolve) => {
-      canvas.toBlob(resolve, 'image/png');
-    });
-  }
-};
-
-/**
- * Uncrop an image (expand canvas)
- * @param {File} imageFile - Image file to uncrop
- * @returns {Promise<Blob>} - Uncropped image as blob
- */
-export const uncropImage = async (imageFile) => {
-  // Define extend options
-  const extendPixels = 200; // Default extend amount
-  const extendOptions = {
-    extend_left: extendPixels,
-    extend_right: extendPixels,
-    extend_up: extendPixels,
-    extend_down: extendPixels
-  };
-
-  try {
-    console.log('Uncropping image:', imageFile.name);
-
-    // Call the secure API proxy
-    const imageBlob = await clipdropAPI.uncropImage(imageFile, extendOptions);
-    console.log('Received image blob:', imageBlob.size, 'bytes, type:', imageBlob.type);
-
-    return imageBlob;
-  } catch (error) {
-    console.error('Error uncropping image:', error);
-
-    // Create fallback uncropped image
-    console.log('Creating fallback uncropped image...');
-
-    // Load the original image
-    const imageUrl = await readFileAsDataURL(imageFile);
-    const img = await loadImage(imageUrl);
-
-    // Create canvas with expanded dimensions
-    const expandFactor = 1.5; // Expand by 50%
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width * expandFactor;
-    canvas.height = img.height * expandFactor;
-    const ctx = canvas.getContext('2d');
-
-    // Create a subtle pattern for the background
-    createBackgroundPattern(ctx, canvas.width, canvas.height);
-
-    // Draw the original image in the center
-    const offsetX = (canvas.width - img.width) / 2;
-    const offsetY = (canvas.height - img.height) / 2;
-    ctx.drawImage(img, offsetX, offsetY, img.width, img.height);
-
-    // Add a border to show the original image boundaries
-    ctx.strokeStyle = 'rgba(128, 128, 128, 0.5)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(offsetX, offsetY, img.width, img.height);
-
-    // Add label
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.font = '16px Arial';
-    ctx.textAlign = 'right';
-    ctx.fillText('Uncropped (API Error)', canvas.width - 10, canvas.height - 10);
-
-    // Convert canvas to blob
-    return new Promise((resolve) => {
-      canvas.toBlob(resolve, 'image/png');
-    });
-  }
-};
 
 /**
  * Remove background from an image
@@ -286,78 +176,7 @@ const loadImage = (url) => {
   });
 };
 
-/**
- * Apply sharpening filter to canvas context
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
- */
-const applySharpening = (ctx, width, height) => {
-  // Get image data
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-  const dataBackup = new Uint8ClampedArray(data);
 
-  // Simple sharpening kernel
-  const kernel = [
-    0, -1, 0,
-    -1, 5, -1,
-    0, -1, 0
-  ];
-
-  // Apply convolution
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      const offset = (y * width + x) * 4;
-
-      for (let c = 0; c < 3; c++) {
-        let val = 0;
-        for (let ky = -1; ky <= 1; ky++) {
-          for (let kx = -1; kx <= 1; kx++) {
-            const idx = ((y + ky) * width + (x + kx)) * 4 + c;
-            val += dataBackup[idx] * kernel[(ky + 1) * 3 + (kx + 1)];
-          }
-        }
-        data[offset + c] = Math.max(0, Math.min(255, val));
-      }
-    }
-  }
-
-  // Put the modified image data back
-  ctx.putImageData(imageData, 0, 0);
-};
-
-/**
- * Create a subtle background pattern
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
- */
-const createBackgroundPattern = (ctx, width, height) => {
-  // Fill with a light color
-  ctx.fillStyle = '#f0f0f0';
-  ctx.fillRect(0, 0, width, height);
-
-  // Add subtle grid pattern
-  ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
-  ctx.lineWidth = 0.5;
-
-  const gridSize = 20;
-
-  for (let x = 0; x <= width; x += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, height);
-    ctx.stroke();
-  }
-
-  for (let y = 0; y <= height; y += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(width, y);
-    ctx.stroke();
-  }
-};
 
 /**
  * Background removal algorithm

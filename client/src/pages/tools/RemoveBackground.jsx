@@ -4,11 +4,10 @@ import { downloadImage } from '../../utils/download';
 import { addGalleryItem } from '../../services/local-storage/gallery';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
-import CreditCheck from '../../components/CreditCheck';
 import DashboardContentWrapper from '../../components/DashboardContentWrapper';
 
 const RemoveBackground = () => {
-  const { useCredits, refreshCredits, user } = useAuth();
+  const { user } = useAuth();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -49,13 +48,6 @@ const RemoveBackground = () => {
     setError('');
 
     try {
-      // Use 2 credits for background removal
-      const creditSuccess = await useCredits(2);
-
-      if (!creditSuccess) {
-        throw new Error('Failed to use credits. Please try again.');
-      }
-
       // Call the ClipDrop API to remove background
       const imageBlob = await removeBackground(file);
 
@@ -84,14 +76,8 @@ const RemoveBackground = () => {
 
       // Update state
       setResult(newResult);
-
-      // Refresh credits to ensure UI shows updated balance
-      setTimeout(() => {
-        refreshCredits();
-      }, 500);
     } catch (err) {
       setError('Failed to remove background. Please try again.');
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -208,7 +194,7 @@ const RemoveBackground = () => {
                     <div>
                       <h4 className="font-semibold text-pink-900 dark:text-pink-100 text-sm mb-1">AI Background Removal</h4>
                       <p className="text-pink-700 dark:text-pink-300 text-xs">
-                        Uses 2 credits • Precise edge detection • Transparent PNG output
+                        Precise edge detection • Transparent PNG output
                       </p>
                     </div>
                   </div>
@@ -355,11 +341,4 @@ const RemoveBackground = () => {
   );
 };
 
-// Wrap the component with CreditCheck to ensure user has enough credits
-export default function RemoveBackgroundWithCreditCheck() {
-  return (
-    <CreditCheck requiredCredits={2} toolName="Remove Background">
-      <RemoveBackground />
-    </CreditCheck>
-  );
-}
+export default RemoveBackground;

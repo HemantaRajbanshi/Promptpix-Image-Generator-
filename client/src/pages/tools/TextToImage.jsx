@@ -4,13 +4,12 @@ import { downloadImage } from '../../utils/download';
 import { addGalleryItem } from '../../services/local-storage/gallery';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
-import CreditCheck from '../../components/CreditCheck';
 import PortraitPromptAssistant from '../../components/PortraitPromptAssistant';
 import { useLocation } from 'react-router-dom';
 import DashboardContentWrapper from '../../components/DashboardContentWrapper';
 
 const TextToImage = () => {
-  const { useCredits, refreshCredits, user } = useAuth();
+  const { user } = useAuth();
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -48,13 +47,6 @@ const TextToImage = () => {
     setError('');
 
     try {
-      // Use 2 credits for text-to-image generation
-      const creditSuccess = await useCredits(2);
-
-      if (!creditSuccess) {
-        throw new Error('Failed to use credits. Please try again.');
-      }
-
       // Parse API's fixed resolution into width and height
       const [width, height] = API_RESOLUTION.split('x').map(Number);
 
@@ -98,11 +90,6 @@ const TextToImage = () => {
 
       // Update state
       setResult(newResult);
-
-      // Refresh credits to ensure UI shows updated balance
-      setTimeout(() => {
-        refreshCredits();
-      }, 500);
     } catch (err) {
       // Provide more helpful error messages
       if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
@@ -111,13 +98,11 @@ const TextToImage = () => {
         setError('Authentication error: The API key may be invalid or expired. Please check your API configuration.');
       } else if (err.message.includes('429')) {
         setError('Rate limit exceeded: Too many requests to the API. Please try again later.');
-      } else if (err.message.includes('Failed to use credits')) {
-        setError('Insufficient credits: You need more credits to generate images.');
       } else {
         setError('Failed to generate image. Please try again.');
       }
 
-      console.error('Image generation error:', err);
+
     } finally {
       setLoading(false);
     }
@@ -315,7 +300,6 @@ const TextToImage = () => {
                             downloadImage(result.url, `promptpix-${Date.now()}.png`);
                           }
                         } catch (error) {
-                          console.error('Error in download handler:', error);
                           alert('Failed to download image. Please try again.');
                         }
                       }}
@@ -376,11 +360,4 @@ const TextToImage = () => {
   );
 };
 
-// Wrap the component with CreditCheck to ensure user has enough credits
-export default function TextToImageWithCreditCheck() {
-  return (
-    <CreditCheck requiredCredits={2} toolName="Text to Image">
-      <TextToImage />
-    </CreditCheck>
-  );
-}
+export default TextToImage;

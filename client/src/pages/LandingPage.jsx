@@ -63,8 +63,6 @@ const slideUp = {
 const getTypeDisplayName = (type) => {
   const typeMap = {
     'text-to-image': 'AI Generated Image',
-    'upscale': 'Enhanced Image',
-    'uncrop': 'Expanded Image',
     'remove-bg': 'Background Removed',
     'image-editor': 'Edited Image'
   };
@@ -361,16 +359,7 @@ const LandingPage = () => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                               </svg>
                             )}
-                            {activity.type === 'upscale' && (
-                              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                              </svg>
-                            )}
-                            {activity.type === 'uncrop' && (
-                              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-                              </svg>
-                            )}
+
                             {activity.type === 'remove-bg' && (
                               <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -1008,7 +997,7 @@ const LandingPage = () => {
                     </div>
 
                     <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
-                      Enhance your images with powerful AI tools. Upscale for higher resolution, remove backgrounds instantly, or expand images beyond their borders with intelligent uncropping.
+                      Enhance your images with powerful AI tools. Remove backgrounds instantly or edit your images with our comprehensive image editor.
                     </p>
 
                     {/* Enhancement Tools */}
@@ -1237,7 +1226,7 @@ const LandingPage = () => {
           {[
             {
               question: "How does the credit system work?",
-              answer: "You start with 10 free credits when you sign up. Each AI operation (text-to-image, upscale, uncrop, remove background) costs 2 credits. The Image Editor is completely free to use with no credit requirements. You can purchase additional credits anytime."
+              answer: "You start with 10 free credits when you sign up. Each AI operation (text-to-image, remove background) costs 2 credits. The Image Editor is completely free to use with no credit requirements. You can purchase additional credits anytime."
             },
             {
               question: "What image formats and sizes are supported?",
@@ -1253,7 +1242,7 @@ const LandingPage = () => {
             },
             {
               question: "How fast is image generation?",
-              answer: "Our AI models typically generate images in 3-5 seconds. Image enhancement operations like upscaling and background removal usually complete in 2-3 seconds. Processing times may vary slightly during peak usage."
+              answer: "Our AI models typically generate images in 3-5 seconds. Image enhancement operations like background removal usually complete in 2-3 seconds. Processing times may vary slightly during peak usage."
             },
             {
               question: "What makes PromptPix different from other AI image tools?",
