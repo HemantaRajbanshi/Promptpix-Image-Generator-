@@ -58,7 +58,7 @@ export const AuthProvider = ({ children }) => {
           _id: response.data.user._id || response.data.user.id || 'user-id',
           displayName: response.data.user.displayName || 'User',
           email: response.data.user.email || 'user@example.com',
-          credits: response.data.user.credits || 0,
+
           profilePicture: response.data.user.profilePicture || '',
           bio: response.data.user.bio || '',
           imagesGenerated: response.data.user.imagesGenerated || 0,
@@ -82,7 +82,7 @@ export const AuthProvider = ({ children }) => {
                 _id: retryResponse.data.user._id || retryResponse.data.user.id || 'user-id',
                 displayName: retryResponse.data.user.displayName || 'User',
                 email: retryResponse.data.user.email || 'user@example.com',
-                credits: retryResponse.data.user.credits || 0,
+
                 profilePicture: retryResponse.data.user.profilePicture || '',
                 bio: retryResponse.data.user.bio || '',
                 imagesGenerated: retryResponse.data.user.imagesGenerated || 0,
@@ -164,7 +164,7 @@ export const AuthProvider = ({ children }) => {
           _id: response.data.user._id || response.data.user.id || 'user-id',
           displayName: response.data.user.displayName || 'User',
           email: response.data.user.email || email,
-          credits: response.data.user.credits || 0,
+
           profilePicture: response.data.user.profilePicture || '',
           bio: response.data.user.bio || '',
           imagesGenerated: response.data.user.imagesGenerated || 0,
@@ -211,7 +211,7 @@ export const AuthProvider = ({ children }) => {
           _id: response.data.user._id || response.data.user.id || 'user-id',
           displayName: response.data.user.displayName || displayName,
           email: response.data.user.email || email,
-          credits: response.data.user.credits || 0,
+
           profilePicture: response.data.user.profilePicture || '',
           bio: response.data.user.bio || '',
           imagesGenerated: response.data.user.imagesGenerated || 0,
@@ -416,109 +416,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const useCredits = async (amount) => {
-    if (!user) return false;
 
-    const currentCredits = user.credits || 0;
 
-    if (currentCredits < amount) {
-      setError('Not enough credits');
-      return false;
-    }
 
-    try {
-      const response = await userAPI.useCredits(amount);
 
-      if (response && response.data && response.data.user) {
-        setUser(response.data.user);
-        return true;
-      } else {
-        // For development mode, handle the case where the server might not return a proper user object
-        if (process.env.NODE_ENV !== 'production') {
-          // Update the user credits locally
-          setUser(prevUser => ({
-            ...prevUser,
-            credits: Math.max(0, (prevUser.credits || 0) - amount)
-          }));
-          return true;
-        } else {
-          setError('Failed to use credits: Invalid server response');
-          return false;
-        }
-      }
-    } catch (err) {
-      // For development mode, allow credit usage even if the API fails
-      if (process.env.NODE_ENV !== 'production') {
-        // Update the user credits locally
-        setUser(prevUser => ({
-          ...prevUser,
-          credits: Math.max(0, (prevUser.credits || 0) - amount)
-        }));
-        return true;
-      }
 
-      setError('Failed to use credits');
-      return false;
-    }
-  };
-
-  const hasEnoughCredits = (amount) => {
-    if (!user) return false;
-    const currentCredits = user.credits || 0;
-    return currentCredits >= amount;
-  };
-
-  // Function to refresh user credits specifically
-  const refreshCredits = async () => {
-    if (!user || creditsLoading) return;
-
-    setCreditsLoading(true);
-    try {
-      const response = await userAPI.getCurrentUser();
-      if (response && response.data && response.data.user) {
-        setUser(prevUser => ({
-          ...prevUser,
-          credits: response.data.user.credits || 0
-        }));
-
-        // Dispatch a custom event to notify components of successful refresh
-        window.dispatchEvent(new CustomEvent('creditsRefreshed', {
-          detail: { credits: response.data.user.credits || 0 }
-        }));
-
-        return true; // Indicate success
-      }
-      return false;
-    } catch (err) {
-      // Don't set error for credit refresh failures to avoid disrupting UX
-      return false;
-    } finally {
-      setCreditsLoading(false);
-    }
-  };
-
-  // Set up automatic credit refresh when user is authenticated
-  useEffect(() => {
-    if (user && !loading) {
-      // Refresh credits every 30 seconds
-      refreshIntervalRef.current = setInterval(refreshCredits, 30000);
-
-      return () => {
-        if (refreshIntervalRef.current) {
-          clearInterval(refreshIntervalRef.current);
-        }
-      };
-    }
-  }, [user, loading]);
-
-  // Clean up interval on unmount
-  useEffect(() => {
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
-    };
-  }, []);
 
   const value = {
     user,

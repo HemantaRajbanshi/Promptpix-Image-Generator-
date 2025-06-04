@@ -19,7 +19,7 @@ const AdjustmentTool = ({ imageUrl, canvasRef, onSave }) => {
   const [isApplying, setIsApplying] = useState(false);
   const [originalImageData, setOriginalImageData] = useState(null);
 
- 
+  // Refs
   const originalImageRef = useRef(null);
   const debounceTimerRef = useRef(null);
 
