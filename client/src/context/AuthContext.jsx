@@ -426,16 +426,11 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     error,
-    creditsLoading,
     login,
     signup,
     logout,
     completeLogout, // For account deletion with full cleanup
     updateUser,
-    addCredits,
-    useCredits,
-    hasEnoughCredits,
-    refreshCredits,
     fetchCurrentUser, // Expose this function to components
     isAuthenticated: !!user,
   };

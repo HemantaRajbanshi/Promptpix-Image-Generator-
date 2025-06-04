@@ -992,7 +992,7 @@ const LandingPage = () => {
                       </div>
                       <div>
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Image Enhancement</h3>
-                        <p className="text-blue-600 dark:text-blue-400 font-medium">2 credits per operation</p>
+                        <p className="text-green-600 dark:text-green-400 font-medium">Completely Free</p>
                       </div>
                     </div>
 
@@ -1225,8 +1225,8 @@ const LandingPage = () => {
         >
           {[
             {
-              question: "How does the credit system work?",
-              answer: "You start with 10 free credits when you sign up. Each AI operation (text-to-image, remove background) costs 2 credits. The Image Editor is completely free to use with no credit requirements. You can purchase additional credits anytime."
+              question: "Is PromptPix really free to use?",
+              answer: "All AI operations are completely free to use. Generate images from text, remove backgrounds, and edit images with our comprehensive image editor - no credits or payments required."
             },
             {
               question: "What image formats and sizes are supported?",
