@@ -1,6 +1,8 @@
 import { useRef, useEffect, useState } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import { userAPI } from '../services/api';
+import { getUserGalleryItems, getUserStatistics } from '../services/local-storage/gallery';
 
 // Import Material Design 3 components
 import Button from '../components/md3/Button';
@@ -147,6 +149,8 @@ const LandingPage = () => {
     });
     const [recentActivity, setRecentActivity] = useState([]);
     const [copiedPrompt, setCopiedPrompt] = useState(null);
+    const [dashboardData, setDashboardData] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     // Copy prompt to clipboard
     const copyPromptToClipboard = async (promptText, index) => {
@@ -178,19 +182,130 @@ const LandingPage = () => {
       }
     };
 
-    // Initialize with empty data - real data would come from API calls
-    useEffect(() => {
-      if (user) {
-        // For now, we'll use empty arrays since the actual data loading
-        // functions don't exist yet. In a real implementation, these would
-        // be API calls to fetch user's gallery items and statistics.
-        setRecentActivity([]);
-        setUserStats({
-          totalImages: 0,
-          imagesGenerated: 0,
-          imagesEdited: 0
-        });
+    // Fetch real user data and activity
+    const fetchUserData = async () => {
+      if (!user) return;
+
+      try {
+        setLoading(true);
+
+        // Fetch dashboard data from API
+        const dashboardResponse = await userAPI.getDashboardData();
+        setDashboardData(dashboardResponse.data);
+
+        // Get local gallery statistics
+        const localStats = getUserStatistics(user.id || user._id);
+        const localGalleryItems = getUserGalleryItems(user.id || user._id);
+
+        // Combine API data with local gallery data for comprehensive stats
+        const combinedStats = {
+          totalImages: Math.max(
+            dashboardResponse.data.statistics?.totalImagesGenerated || 0,
+            localStats.totalImages
+          ),
+          imagesGenerated: Math.max(
+            dashboardResponse.data.statistics?.totalImagesGenerated || 0,
+            localStats.imagesGenerated
+          ),
+          imagesEdited: Math.max(
+            dashboardResponse.data.statistics?.totalImagesEdited || 0,
+            localStats.imagesEdited
+          )
+        };
+
+        setUserStats(combinedStats);
+
+        // Format recent activity from API data
+        const apiActivity = dashboardResponse.data.recentActivity?.all || [];
+        const formattedActivity = apiActivity.map(activity => ({
+          id: activity._id || `activity-${Date.now()}-${Math.random()}`,
+          type: activity.operation,
+          title: getActivityTitle(activity.operation),
+          description: activity.description || getActivityDescription(activity.operation),
+          time: formatTimeAgo(activity.timestamp),
+          timestamp: activity.timestamp
+        }));
+
+        // Add recent local gallery items if API activity is limited
+        if (formattedActivity.length < 5) {
+          const recentLocalItems = localGalleryItems.slice(0, 5 - formattedActivity.length);
+          const localActivityItems = recentLocalItems.map(item => ({
+            id: item.id,
+            type: item.type,
+            title: getActivityTitle(item.type),
+            description: item.prompt || getActivityDescription(item.type),
+            time: formatTimeAgo(item.createdAt),
+            timestamp: item.createdAt
+          }));
+
+          formattedActivity.push(...localActivityItems);
+        }
+
+        // Sort by timestamp (newest first) and limit to 10 items
+        const sortedActivity = formattedActivity
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+          .slice(0, 10);
+
+        setRecentActivity(sortedActivity);
+
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+
+        // Fallback to local data only
+        const localStats = getUserStatistics(user.id || user._id);
+        const localGalleryItems = getUserGalleryItems(user.id || user._id);
+
+        setUserStats(localStats);
+
+        const localActivity = localGalleryItems.slice(0, 10).map(item => ({
+          id: item.id,
+          type: item.type,
+          title: getActivityTitle(item.type),
+          description: item.prompt || getActivityDescription(item.type),
+          time: formatTimeAgo(item.createdAt),
+          timestamp: item.createdAt
+        }));
+
+        setRecentActivity(localActivity);
+      } finally {
+        setLoading(false);
       }
+    };
+
+    // Helper functions for activity formatting
+    const getActivityTitle = (type) => {
+      const titles = {
+        'text-to-image': 'Generated Image',
+        'remove-background': 'Removed Background',
+        'image-editor': 'Edited Image',
+        'daily-reset': 'Credits Reset'
+      };
+      return titles[type] || 'Activity';
+    };
+
+    const getActivityDescription = (type) => {
+      const descriptions = {
+        'text-to-image': 'Created a new image from text prompt',
+        'remove-background': 'Removed background from image',
+        'image-editor': 'Applied edits to image',
+        'daily-reset': 'Daily credits were reset'
+      };
+      return descriptions[type] || 'Performed an action';
+    };
+
+    useEffect(() => {
+      fetchUserData();
+
+      // Listen for gallery updates to refresh activity
+      const handleGalleryUpdate = () => {
+        fetchUserData();
+      };
+
+      window.addEventListener('galleryUpdated', handleGalleryUpdate);
+
+      return () => {
+        window.removeEventListener('galleryUpdated', handleGalleryUpdate);
+      };
     }, [user]);
 
     return (
@@ -313,10 +428,12 @@ const LandingPage = () => {
                     transition={{ duration: 0.2 }}
                   >
                     <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
-                      {user?.credits || 0}
+                      {loading ? '...' : (dashboardData?.creditInfo?.currentCredits || user?.credits || 0)}
                     </div>
                     <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Creative Credits</div>
-                    <div className="text-xs text-purple-600 dark:text-purple-400">Ready to create</div>
+                    <div className="text-xs text-purple-600 dark:text-purple-400">
+                      {loading ? 'Loading...' : `${dashboardData?.creditInfo?.remainingToday || 0} remaining today`}
+                    </div>
                   </motion.div>
 
                   <motion.div
@@ -325,10 +442,12 @@ const LandingPage = () => {
                     transition={{ duration: 0.2 }}
                   >
                     <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
-                      {userStats.totalImages}
+                      {loading ? '...' : userStats.totalImages}
                     </div>
                     <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Images Created</div>
-                    <div className="text-xs text-blue-600 dark:text-blue-400">Your gallery</div>
+                    <div className="text-xs text-blue-600 dark:text-blue-400">
+                      {loading ? 'Loading...' : 'Your gallery'}
+                    </div>
                   </motion.div>
                 </div>
 
@@ -342,7 +461,20 @@ const LandingPage = () => {
                     </svg>
                     Recent Activity
                   </h4>
-                  {recentActivity.length > 0 ? (
+                  {loading ? (
+                    <div className="space-y-3">
+                      {[...Array(3)].map((_, index) => (
+                        <div key={index} className="flex items-center p-4 bg-gradient-to-r from-white/50 to-gray-50/50 dark:from-gray-800/50 dark:to-gray-900/50 rounded-xl border border-gray-100/50 dark:border-gray-700/50">
+                          <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-xl mr-4 animate-pulse"></div>
+                          <div className="flex-1">
+                            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2 animate-pulse"></div>
+                            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-1 animate-pulse"></div>
+                            <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded w-1/2 animate-pulse"></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : recentActivity.length > 0 ? (
                     <div className="space-y-3">
                       {recentActivity.map((activity, index) => (
                         <motion.div
@@ -354,13 +486,13 @@ const LandingPage = () => {
                           whileHover={{ scale: 1.02, x: 4 }}
                         >
                           <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mr-4 shadow-lg">
-                            {activity.type === 'text-to-image' && (
+                            {(activity.type === 'text-to-image' || activity.type === 'daily-reset') && (
                               <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                               </svg>
                             )}
 
-                            {activity.type === 'remove-bg' && (
+                            {(activity.type === 'remove-bg' || activity.type === 'remove-background') && (
                               <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                               </svg>
@@ -373,7 +505,7 @@ const LandingPage = () => {
                           </div>
                           <div className="flex-1">
                             <p className="font-semibold text-gray-800 dark:text-gray-200 mb-1">{activity.title}</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{activity.description}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 line-clamp-2">{activity.description}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-500">{activity.time}</p>
                           </div>
                         </motion.div>
@@ -554,17 +686,17 @@ const LandingPage = () => {
   // Sample AI-generated images for carousel
   const sampleImages = [
     {
-      url: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImEiIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM2NzUwQTQiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiM5QzY5RkYiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNhKSIgcng9IjIwIi8+PGNpcmNsZSBjeD0iMjUwIiBjeT0iMjUwIiByPSIxMDAiIGZpbGw9IiNGRkZGRkYiIG9wYWNpdHk9IjAuMyIvPjx0ZXh0IHg9IjI1MCIgeT0iMjYwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZvbnQtd2VpZ2h0PSJib2xkIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjRkZGRkZGIj5BSSBBcnQ8L3RleHQ+PC9zdmc+",
+      url: "/images/testimonials/Ethereal forest with glowing mushrooms.png",
       prompt: "Ethereal forest with glowing mushrooms",
       type: "Fantasy Art"
     },
     {
-      url: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImIiIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM4MzY1RkYiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNEMEJDRkYiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNiKSIgcng9IjIwIi8+PHJlY3QgeD0iMTAwIiB5PSIxMDAiIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjIiIHJ4PSIxMCIvPjx0ZXh0IHg9IjI1MCIgeT0iMjYwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjAiIGZvbnQtd2VpZ2h0PSJib2xkIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjRkZGRkZGIj5Qb3J0cmFpdDwvdGV4dD48L3N2Zz4=",
+      url: "/images/testimonials/Professional portrait photography.png",
       prompt: "Professional portrait photography",
       type: "Portrait"
     },
     {
-      url: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImMiIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNGRjZBOTUiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNGRkI4RTQiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNjKSIgcng9IjIwIi8+PGVsbGlwc2UgY3g9IjI1MCIgY3k9IjE1MCIgcng9IjE1MCIgcnk9IjUwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjMiLz48dGV4dCB4PSIyNTAiIHk9IjM1MCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjIwIiBmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI0ZGRkZGRiI+TGFuZHNjYXBlPC90ZXh0Pjwvc3ZnPg==",
+      url: "/images/testimonials/Sunset mountain landscape.png",
       prompt: "Sunset mountain landscape",
       type: "Landscape"
     }
@@ -1000,25 +1132,29 @@ const LandingPage = () => {
                       Enhance your images with powerful AI tools. Remove backgrounds instantly or edit your images with our comprehensive image editor.
                     </p>
 
-                    {/* Enhancement Tools */}
+                    {/* Enhancement Tools - Only Background Removal for non-authenticated users */}
                     <div className="space-y-3 mb-6">
-                      {[
-                        { name: 'Upscale', desc: 'Increase resolution up to 4x', icon: '🔍' },
-                        { name: 'Remove Background', desc: 'Clean background removal', icon: '✂️' },
-                        { name: 'Uncrop', desc: 'Expand image boundaries', icon: '📐' }
-                      ].map((tool, index) => (
-                        <div key={index} className="flex items-center p-3 bg-gradient-to-r from-white to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/20 rounded-lg">
-                          <span className="text-lg mr-3">{tool.icon}</span>
-                          <div>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">{tool.name}</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">{tool.desc}</p>
-                          </div>
+                      <div className="flex items-center p-3 bg-gradient-to-r from-white to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/20 rounded-lg">
+                        <span className="text-lg mr-3">✂️</span>
+                        <div>
+                          <p className="font-medium text-gray-800 dark:text-gray-200">Remove Background</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Clean background removal with AI precision</p>
                         </div>
-                      ))}
+                      </div>
+
+                      {/* Note about additional features */}
+                      <div className="p-3 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-lg border border-purple-200/50 dark:border-purple-700/50">
+                        <p className="text-sm text-purple-700 dark:text-purple-300 font-medium mb-1">
+                          🎨 More Enhancement Tools Available
+                        </p>
+                        <p className="text-xs text-purple-600 dark:text-purple-400">
+                          Sign up to access upscaling, uncropping, and advanced editing features
+                        </p>
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      {['Photo Enhancement', 'Product Images', 'Professional Photos'].map((tag, index) => (
+                      {['Background Removal', 'Product Images', 'Professional Photos'].map((tag, index) => (
                         <span key={index} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full">
                           {tag}
                         </span>
@@ -1357,7 +1493,7 @@ const LandingPage = () => {
                 {[
                   { icon: '🚀', text: 'Start in seconds' },
                   { icon: '💳', text: 'No credit card required' },
-                  { icon: '🎨', text: '10 free credits included' }
+                  { icon: '🎨', text: '10 free credits daily' }
                 ].map((benefit, index) => (
                   <div key={index} className="flex items-center text-white/90">
                     <span className="text-2xl mr-2">{benefit.icon}</span>

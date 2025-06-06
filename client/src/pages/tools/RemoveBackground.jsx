@@ -5,6 +5,8 @@ import { addGalleryItem } from '../../services/local-storage/gallery';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import DashboardContentWrapper from '../../components/DashboardContentWrapper';
+import { userAPI } from '../../services/api';
+import { CREDIT_CONFIG } from '../../constants';
 
 const RemoveBackground = () => {
   const { user } = useAuth();
@@ -13,6 +15,8 @@ const RemoveBackground = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+
+  const requiredCredits = CREDIT_CONFIG.OPERATIONS.REMOVE_BACKGROUND;
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -93,21 +97,25 @@ const RemoveBackground = () => {
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="mb-10"
         >
-          <div className="flex items-center space-x-4 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-pink-600 to-rose-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-                Remove Background
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 text-lg">Instantly remove backgrounds with AI precision</p>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-r from-pink-600 to-rose-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                  Remove Background
+                </h1>
+                <p className="text-gray-600 dark:text-gray-400 text-lg">Instantly remove backgrounds with AI precision</p>
+              </div>
             </div>
           </div>
         </motion.div>
+
+
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Upload Section */}

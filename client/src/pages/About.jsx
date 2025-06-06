@@ -137,11 +137,11 @@ const About = () => {
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary-80/20 to-tertiary-80/20 mix-blend-overlay z-10"></div>
                 <img
-                  src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImMiIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM2NzUwQTQiLz48c3RvcCBvZmZzZXQ9IjUwJSIgc3RvcC1jb2xvcj0iIzgzNjVGRiIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzlDNjlGRiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSI4MDAiIGhlaWdodD0iNTAwIiBmaWxsPSJ1cmwoI2MpIi8+PGNpcmNsZSBjeD0iMjAwIiBjeT0iMTUwIiByPSI0MCIgZmlsbD0iI0ZGRkZGRiIgb3BhY2l0eT0iMC4zIi8+PGNpcmNsZSBjeD0iNjAwIiBjeT0iMzAwIiByPSI2MCIgZmlsbD0iI0ZGRkZGRiIgb3BhY2l0eT0iMC4yIi8+PHRleHQgeD0iNDAwIiB5PSIyMzAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzNiIgZm9udC13ZWlnaHQ9ImJvbGQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNGRkZGRkYiPk91ciBKb3VybmV5PC90ZXh0Pjx0ZXh0IHg9IjQwMCIgeT0iMjcwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNGRkZGRkYiIG9wYWNpdHk9IjAuOCI+QnVpbGRpbmcgdGhlIGZ1dHVyZSBvZiBBSSBpbWFnZSBnZW5lcmF0aW9uPC90ZXh0Pjwvc3ZnPg=="
+                  src="/images/about/our journey.png"
                   alt="Our journey"
                   className="w-full h-auto transform transition-transform duration-700 hover:scale-105"
                 />
-                <div className="absolute top-0 right-0 bg-primary-40 text-on-primary text-xs font-bold px-3 py-1 rounded-bl-medium">EST. 2023</div>
+                <div className="absolute top-0 right-0 bg-primary-40 text-on-primary text-xs font-bold px-3 py-1 rounded-bl-medium">EST. 2024</div>
               </div>
             </Card>
           </motion.div>

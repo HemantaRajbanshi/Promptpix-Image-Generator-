@@ -2,6 +2,8 @@ import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence} from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import CreditStatus from '../components/CreditStatus';
+import DashboardHome from './tools/DashboardHome';
 
 
 const Dashboard = () => {
@@ -9,6 +11,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [creditData, setCreditData] = useState(null);
   const profileMenuRef = useRef(null);
   const mouseLeaveTimeoutRef = useRef(null);
 
@@ -314,14 +317,24 @@ const Dashboard = () => {
               </motion.div>
             </Link>
             <div className="flex items-center justify-between">
-              <motion.p
-                className="text-sm text-on-surface-variant font-medium"
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.4 }}
+                className="space-y-2"
               >
-                Welcome, <span className="text-primary-40 font-semibold">{user?.displayName || 'Test User'}</span>
-              </motion.p>
+                <p className="text-sm text-on-surface-variant font-medium">
+                  Welcome, <span className="text-primary-40 font-semibold">{user?.displayName || 'Test User'}</span>
+                </p>
+
+                {/* Credit Status in Sidebar */}
+                <CreditStatus
+                  variant="compact"
+                  showRefresh={false}
+                  onCreditUpdate={setCreditData}
+                  className="mt-2"
+                />
+              </motion.div>
 
               {/* User Menu */}
               <motion.div
@@ -497,72 +510,7 @@ const Dashboard = () => {
                     delay: 0.1
                   }}
                 >
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1, duration: 0.5 }}
-                >
-                  <h1 className="headline-large text-on-surface mb-2">
-                    Welcome to <span className="text-primary-40">PromptPix</span>
-                  </h1>
-                  <p className="body-large text-on-surface-variant mb-8">
-                    Select a tool from the sidebar to get started with your creative journey.
-                  </p>
-                </motion.div>
-
-                <motion.div
-                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate="visible"
-                >
-                  {tools.map((tool) => (
-                    <motion.div
-                      key={tool.id}
-                      variants={itemVariants}
-                      whileHover={{
-                        y: -12,
-                        scale: 1.02,
-                        transition: { type: 'spring', stiffness: 400, damping: 25 }
-                      }}
-                    >
-                      <Link
-                        to={tool.path}
-                        className="bg-white/90 dark:bg-gray-800/90 block p-8 h-full rounded-3xl shadow-elevation-1 transition-all duration-medium ease-emphasized border border-outline-variant/10 group hover:shadow-elevation-4"
-                        style={{
-                          backdropFilter: 'blur(20px)',
-                          WebkitBackdropFilter: 'blur(20px)',
-                        }}
-                      >
-                        <div className="flex items-center mb-6">
-                          <div className="bg-primary-90 p-4 rounded-2xl transition-colors duration-medium shadow-elevation-1 group-hover:bg-primary-80">
-                            <motion.svg
-                              className="h-6 w-6 text-primary-40"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              whileHover={{ rotate: 10, scale: 1.1 }}
-                              transition={{ type: 'spring', stiffness: 400, damping: 10 }}
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d={tool.icon}
-                              />
-                            </motion.svg>
-                          </div>
-                          <h3 className="ml-4 title-large text-on-surface transition-colors duration-medium group-hover:text-primary-40">
-                            {tool.name}
-                          </h3>
-                        </div>
-                        <p className="body-medium text-on-surface-variant transition-colors duration-medium group-hover:text-on-surface">
-                          Click to start using {tool.name}
-                        </p>
-                      </Link>
-                    </motion.div>
-                  ))}
-                </motion.div>
+                  <DashboardHome />
               </motion.div>
             ) : (
               <motion.div

@@ -4,6 +4,7 @@ const { promisify } = require('util');
 const { createCompleteUser, createMockUser } = require('../utils/userUtils');
 const crypto = require('crypto');
 const emailService = require('../services/emailService');
+const { checkAndResetCredits } = require('../services/creditResetService');
 
 // Create JWT token
 const signToken = (id) => {
@@ -119,8 +120,11 @@ exports.login = async (req, res, next) => {
         });
       }
 
-      // Send token
-      createSendToken(user, 200, req, res);
+      // Check and reset daily credits if needed
+      const updatedUser = await checkAndResetCredits(user._id);
+
+      // Send token with updated user data
+      createSendToken(updatedUser, 200, req, res);
     } catch (dbError) {
       console.error('Database error during login:', dbError);
 
@@ -215,8 +219,11 @@ exports.protect = async (req, res, next) => {
           }
         }
 
+        // Check and reset daily credits if needed
+        const updatedUser = await checkAndResetCredits(currentUser._id);
+
         // Convert to plain object and ensure all required fields are present
-        const userObject = currentUser.toObject ? currentUser.toObject() : { ...currentUser };
+        const userObject = updatedUser.toObject ? updatedUser.toObject() : { ...updatedUser };
         const completeUser = createCompleteUser(userObject);
 
         // Grant access to protected route with complete user object

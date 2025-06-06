@@ -28,10 +28,19 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true // Set to true since we're giving 10 credits by default
   },
+  lastCreditReset: {
+    type: Date,
+    default: Date.now
+  },
+  dailyCreditResetCount: {
+    type: Number,
+    default: 0
+  },
   creditHistory: [{
     operation: {
       type: String,
-      required: true
+      required: true,
+      enum: ['text-to-image', 'remove-background', 'daily-reset', 'purchase', 'admin-grant']
     },
     amount: {
       type: Number,
@@ -44,6 +53,10 @@ const userSchema = new mongoose.Schema({
     description: {
       type: String,
       default: ''
+    },
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
     }
   }],
   profilePicture: {

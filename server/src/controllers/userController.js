@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const { createCompleteUser } = require('../utils/userUtils');
 const { addCreditsToUser, getCreditHistory } = require('../middleware/creditMiddleware');
+const { getTimeUntilReset, checkAndResetCredits } = require('../services/creditResetService');
 
 // Throttling map to limit update frequency
 // Key: userId, Value: timestamp of last update
@@ -222,6 +223,112 @@ exports.getCreditHistory = async (req, res) => {
     res.status(400).json({
       status: 'fail',
       message: error.message
+    });
+  }
+};
+
+// Get dashboard data with recent activity and credit information
+exports.getDashboardData = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get updated user data with potential credit reset
+    const user = await checkAndResetCredits(userId);
+
+    // Get recent credit history (last 20 items)
+    const recentActivity = await getCreditHistory(userId, 20);
+
+    // Filter activity for different types
+    const imageGenerations = recentActivity.filter(item => item.operation === 'text-to-image');
+    const backgroundRemovals = recentActivity.filter(item => item.operation === 'remove-background');
+    const creditResets = recentActivity.filter(item => item.operation === 'daily-reset');
+
+    // Get time until next reset
+    const resetInfo = getTimeUntilReset(user);
+
+    // Calculate today's usage
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const todaysActivity = recentActivity.filter(item => {
+      const itemDate = new Date(item.timestamp);
+      itemDate.setHours(0, 0, 0, 0);
+      return itemDate.getTime() === today.getTime();
+    });
+
+    const todaysCreditsUsed = todaysActivity
+      .filter(item => item.amount < 0)
+      .reduce((total, item) => total + Math.abs(item.amount), 0);
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        user: {
+          id: user._id,
+          displayName: user.displayName,
+          email: user.email,
+          credits: user.credits,
+          imagesGenerated: user.imagesGenerated,
+          imagesEdited: user.imagesEdited,
+          lastCreditReset: user.lastCreditReset,
+          dailyCreditResetCount: user.dailyCreditResetCount
+        },
+        creditInfo: {
+          currentCredits: user.credits,
+          dailyLimit: 10,
+          todaysUsage: todaysCreditsUsed,
+          remainingToday: Math.max(0, 10 - todaysCreditsUsed),
+          timeUntilReset: resetInfo
+        },
+        recentActivity: {
+          all: recentActivity.slice(0, 10), // Last 10 activities
+          imageGenerations: imageGenerations.slice(0, 5),
+          backgroundRemovals: backgroundRemovals.slice(0, 5),
+          creditResets: creditResets.slice(0, 3)
+        },
+        statistics: {
+          totalImagesGenerated: user.imagesGenerated || 0,
+          totalImagesEdited: user.imagesEdited || 0,
+          totalCreditResets: user.dailyCreditResetCount || 0,
+          memberSince: user.createdAt
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error getting dashboard data:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to load dashboard data'
+    });
+  }
+};
+
+// Get current credit status and reset information
+exports.getCreditStatus = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get updated user data with potential credit reset
+    const user = await checkAndResetCredits(userId);
+
+    // Get time until next reset
+    const resetInfo = getTimeUntilReset(user);
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        credits: user.credits,
+        lastReset: user.lastCreditReset,
+        resetCount: user.dailyCreditResetCount,
+        timeUntilReset: resetInfo,
+        dailyLimit: 10
+      }
+    });
+  } catch (error) {
+    console.error('Error getting credit status:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get credit status'
     });
   }
 };

@@ -13,5 +13,7 @@ router.patch('/updateMe', userController.updateMe);
 router.post('/addCredits', userController.addCredits);
 router.post('/useCredits', userController.useCredits);
 router.get('/credit-history', userController.getCreditHistory);
+router.get('/dashboard-data', userController.getDashboardData);
+router.get('/credit-status', userController.getCreditStatus);
 
 module.exports = router;

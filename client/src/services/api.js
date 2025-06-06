@@ -205,6 +205,16 @@ export const userAPI = {
   getCreditHistory: async (limit = 50) => {
     return apiRequest(`/users/credit-history?limit=${limit}`);
   },
+
+  // Get dashboard data
+  getDashboardData: async () => {
+    return apiRequest('/users/dashboard-data');
+  },
+
+  // Get credit status
+  getCreditStatus: async () => {
+    return apiRequest('/users/credit-status');
+  },
 };
 
 // ClipDrop API

@@ -7,6 +7,8 @@ import { useAuth } from '../../context/AuthContext';
 import PortraitPromptAssistant from '../../components/PortraitPromptAssistant';
 import { useLocation } from 'react-router-dom';
 import DashboardContentWrapper from '../../components/DashboardContentWrapper';
+import { userAPI } from '../../services/api';
+import { CREDIT_CONFIG } from '../../constants';
 
 const TextToImage = () => {
   const { user } = useAuth();
@@ -18,6 +20,8 @@ const TextToImage = () => {
   // Use the ClipDrop API's fixed resolution of 1024x1024
   const API_RESOLUTION = '1024x1024';
   const location = useLocation();
+
+  const requiredCredits = CREDIT_CONFIG.OPERATIONS.TEXT_TO_IMAGE;
 
   // Check for prompt in URL params when component mounts
   useEffect(() => {
@@ -118,20 +122,24 @@ const TextToImage = () => {
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="mb-10"
         >
-          <div className="flex items-center space-x-4 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-                Text to Image
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 text-lg">Transform your ideas into stunning visuals with AI</p>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                  Text to Image
+                </h1>
+                <p className="text-gray-600 dark:text-gray-400 text-lg">Transform your ideas into stunning visuals with AI</p>
+              </div>
             </div>
           </div>
         </motion.div>
+
+
 
         {showPromptAssistant ? (
           <motion.div

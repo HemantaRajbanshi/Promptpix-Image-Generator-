@@ -19,6 +19,7 @@ import Settings from './pages/Settings';
 import TextToImage from './pages/tools/TextToImage';
 import RemoveBackground from './pages/tools/RemoveBackground';
 import ImageEditor from './pages/tools/ImageEditor';
+import DashboardHome from './pages/tools/DashboardHome';
 import Gallery from './pages/Gallery';
 
 // Protected Route Component
@@ -78,6 +79,8 @@ const router = createBrowserRouter(
         </ThemeProvider>
       ),
       children: [
+        { index: true, element: <DashboardHome /> },
+        { path: "home", element: <DashboardHome /> },
         { path: "text-to-image", element: <TextToImage /> },
         { path: "remove-bg", element: <RemoveBackground /> },
         { path: "image-editor", element: <ImageEditor /> },
